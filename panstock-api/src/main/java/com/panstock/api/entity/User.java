@@ -1,5 +1,6 @@
 package com.panstock.api.entity;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 
@@ -15,6 +16,8 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -27,7 +30,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Entity
 @Table(name = "users")
-public class User implements UserDetails{
+public class User implements UserDetails {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -54,17 +57,16 @@ public class User implements UserDetails{
 
     public UserDTO toDTO() {
         return new UserDTO(
-            this.id,
-            this.username,
-            this.firstName,
-            this.lastName,
-            this.email,
-            this.password,
-            this.role
-            );
+                this.id,
+                this.username,
+                this.firstName,
+                this.lastName,
+                this.email,
+                this.password,
+                this.role);
     }
 
-    public void updateData(User newUser){
+    public void updateData(User newUser) {
         setFirstName(newUser.getFirstName());
         setLastName(newUser.getLastName());
         setEmail(newUser.getEmail());
@@ -74,4 +76,20 @@ public class User implements UserDetails{
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority(role.name()));
     }
+
+    @Override
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return true;
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+
 }
