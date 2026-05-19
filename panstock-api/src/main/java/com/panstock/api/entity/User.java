@@ -30,7 +30,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Entity
 @Table(name = "users")
-public class User implements UserDetails {
+public class User extends AuditableEntity implements UserDetails {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -54,6 +54,14 @@ public class User implements UserDetails {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private Role role;
+
+    @Column(nullable = false)
+    private Boolean enabled = true;
+
+    @Override
+    public boolean isEnabled() {
+        return Boolean.TRUE.equals(this.enabled);
+    }
 
     public UserDTO toDTO() {
         return new UserDTO(

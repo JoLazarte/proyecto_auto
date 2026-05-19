@@ -35,7 +35,7 @@ public class UserDTO {
                 this.lastName,
                 this.email,
                 this.password,
-                this.role
+                this.role, null
                 );     
                 
     }

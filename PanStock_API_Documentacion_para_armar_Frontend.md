@@ -1,9 +1,26 @@
 # PanStock API - Documentación para Frontend
+
 ## Requisitos previos
 
 Antes de correr esta API es necesario correr el archivo .sql, que está dentro de la carpeta database, en un motor de mysql.
 
 También, se debe actualizar el usuario y contaraseña (segun corresponda) en el archivo application.properties para acceder a la bd creada previamente.
+
+## Consideraciones
+
+
+| Endpoint | Debería poder | Actualmente puede |
+| :--- | :---: | ---: |
+| POST /api/stock/entries | OWNER y EMPLOYEE | OWNER y EMPLOYEE ✓|
+| POST /api/waste-records | OWNER y EMPLOYEE | OWNER y EMPLOYEE ✓|
+| POST /api/stock/sales   | OWNER y EMPLOYEE | OWNER y EMPLOYEE ✓|
+| DELETE /api/suppliers/{id} | solo OWNER | solo OWNER ✓|
+| POST /api/suppliers     | solo OWNER | solo OWNER ✓|
+| PUT /api/suppliers/{id} | solo OWNER | solo OWNER ✓|
+| DELETE /api/categories/{id} | solo OWNER | solo OWNER ✓|
+| PUT /api/settings/** | solo OWNER | solo OWNER ✓|
+| GET /api/reports/** | solo OWNER | solo OWNER ✓|
+| POST /api/promotions | solo OWNER | solo OWNER ✓|
 
 ## 1. Objetivo de este documento
 
@@ -841,7 +858,7 @@ GET /api/users
 | Parámetro | Tipo | Ejemplo |
 |---|---|---|
 | `enabledOnly` | boolean | `true` |
-| `role` | Role | `MANAGER` |
+| `role` | Role | `OWNER` |
 
 Ejemplos:
 
@@ -877,28 +894,67 @@ No se devuelve contraseña.
 ```http
 GET /api/users/{id}
 ```
-
 ---
 
-## 11.4. Crear usuario
+## 11.4. Crear usuario desde Postman con JWToken
 
-```http
-POST /api/users
 ```
-
+Método: POST
+URL: {{base_url}}/auth/register
+Headers: Content-Type: application/json
+Body → raw → JSON:
+```
 ### Request
 
 ```json
 {
-  "firstName": "Sofía",
-  "lastName": "Gómez",
-  "email": "sofia@panstock.local",
+  "username": "usuarioprueba",
+  "firstName": "Pepe",
+  "lastName": "Jefe",
+  "email": "pepejefe@panstock.local",
   "password": "1234",
-  "role": "EMPLOYEE",
-  "enabled": true
+  "role": "OWNER"
 }
-```
 
+```
+Si ya corriste el script SQL con los datos mock, ya hay usuarios creados. En ese caso vamos a autenticarnos/logearnos: 
+Método: POST
+URL: {{base_url}}/auth/authenticate
+Headers: Content-Type: application/json
+Body → raw → JSON:
+```
+```
+### Request
+
+```json
+{
+  "username": "lorena",
+  "password": "1234"
+}
+
+```
+### Response OK
+
+```json
+{
+  "ok": true,
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiJ9...",
+    "username": "lorena",
+    "email": "lorena@panstock.local",
+    "role": "OWNER"
+  }
+}
+
+```
+```
+Configurar la autenticación en todos los requests siguientes
+En cada request que requiera autenticación:
+
+Ir a la pestaña Authorization
+Tipo: Bearer Token
+Token: {{access_token}}
+```
 ### Validaciones relevantes
 
 - `firstName` obligatorio.
@@ -912,38 +968,30 @@ POST /api/users
 ## 11.5. Actualizar usuario
 
 ```http
-PUT /api/users/{id}
+PUT http://localhost:8081/users/update
+Authorization: Bearer <tu_token>
+Content-Type: application/json
+
+El servidor va a ignorar role y username aunque los mandes. Solo va a actualizar lastName y email. Como password es null, la contraseña no cambia
+
 ```
-
-### Request sin cambiar contraseña
-
 ```json
 {
-  "firstName": "Sofía",
-  "lastName": "Gómez",
-  "email": "sofia@panstock.local",
+  "username": "martina",
+  "firstName": "Martina",
+  "lastName": "González",
+  "email": "martina.nueva@panstock.local",
   "password": null,
-  "role": "MANAGER",
-  "enabled": true
+  "role": "OWNER"
 }
 ```
 
-Si `password` viene `null` o vacío, no se modifica.
-
----
-
 ## 11.6. Deshabilitar usuario
 
-```http
-DELETE /api/users/{id}
+```http 
+PATCH http://localhost:8081/users/4/disable
+Authorization: Bearer <token_de_lorena>
 ```
-
-Efecto:
-
-```text
-enabled = false
-```
-
 ---
 
 # 12. Stock
