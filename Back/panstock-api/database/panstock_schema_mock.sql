@@ -255,7 +255,7 @@ INSERT INTO users (id, username, first_name, last_name, email, password, role, e
  '$2a$10$mSv6/GckMyWULmp27zj9XeH6raDO4o/wM2Y8teHyAfPqI0n9Eud.S',
  'EMPLOYEE', TRUE, NOW(), NOW()),
 (4, 'federico', 'Federico', 'Temporal',  'federico.temporal@panstock.local',
- '$$2a$10$mSv6/GckMyWULmp27zj9XeH6raDO4o/wM2Y8teHyAfPqI0n9Eud.S',
+ '$2a$10$mSv6/GckMyWULmp27zj9XeH6raDO4o/wM2Y8teHyAfPqI0n9Eud.S',
  'EMPLOYEE', FALSE, NOW(), NOW());
 
 -- -------------------------------------------------------
@@ -273,7 +273,7 @@ INSERT INTO product_categories (id, name, description, active, created_at, updat
 (9, 'Insumos cafetería',       'Granos de café, azúcar, edulcorante, canela, cacao.',           TRUE,  NOW(), NOW());
 
 -- -------------------------------------------------------
--- PROVEEDORES (datos reales del PDF)
+-- PROVEEDORES 
 -- -------------------------------------------------------
 INSERT INTO suppliers (id, name, supplier_type, contact_name, phone, email, notes, active, created_at, updated_at) VALUES
 (1, 'Dulce Hora Franquicia',        'FRANCHISE',  'Distribuidora Dulce Hora', NULL, NULL,
