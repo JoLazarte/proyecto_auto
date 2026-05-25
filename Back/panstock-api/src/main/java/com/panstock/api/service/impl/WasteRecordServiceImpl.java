@@ -5,6 +5,7 @@ import com.panstock.api.dto.response.WasteRecordResponse;
 import com.panstock.api.entity.*;
 import com.panstock.api.enums.BatchStatus;
 import com.panstock.api.enums.StockMovementType;
+import com.panstock.api.enums.WasteReason;
 import com.panstock.api.exception.BadRequestException;
 import com.panstock.api.exception.ResourceNotFoundException;
 import com.panstock.api.mapper.WasteRecordMapper;
@@ -16,7 +17,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -24,31 +28,31 @@ import java.util.List;
 public class WasteRecordServiceImpl implements WasteRecordService {
 
     private final InventoryBatchRepository inventoryBatchRepository;
-    private final WasteRecordRepository wasteRecordRepository;
-    private final StockMovementRepository stockMovementRepository;
-    private final UserJpaRepository userRepository;
+    private final WasteRecordRepository    wasteRecordRepository;
+    private final StockMovementRepository  stockMovementRepository;
+    private final UserJpaRepository        userRepository;
+
+    // ── CREATE ────────────────────────────────────────────────────────────────
 
     @Override
     public WasteRecordResponse create(WasteRecordRequest request) {
         InventoryBatch batch = inventoryBatchRepository.findById(request.batchId())
-                .orElseThrow(() -> new ResourceNotFoundException("Lote no encontrado con id " + request.batchId()));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Lote no encontrado con id " + request.batchId()));
 
         validateWasteRequest(batch, request);
 
         User user = null;
         if (request.userId() != null) {
             user = userRepository.findById(request.userId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado con id " + request.userId()));
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Usuario no encontrado con id " + request.userId()));
         }
 
-        Product product = batch.getProduct();
-
-        BigDecimal unitCost = batch.getUnitCost() != null ? batch.getUnitCost() : product.getCostPrice();
-        BigDecimal unitSalePrice = batch.getUnitSalePrice() != null ? batch.getUnitSalePrice() : product.getSalePrice();
-
-        if (unitSalePrice == null) {
-            unitSalePrice = BigDecimal.ZERO;
-        }
+        Product product    = batch.getProduct();
+        BigDecimal unitCost       = batch.getUnitCost()       != null ? batch.getUnitCost()       : product.getCostPrice();
+        BigDecimal unitSalePrice  = batch.getUnitSalePrice()  != null ? batch.getUnitSalePrice()  : product.getSalePrice();
+        if (unitSalePrice == null) unitSalePrice = BigDecimal.ZERO;
 
         BigDecimal economicLoss = request.quantity().multiply(unitSalePrice);
 
@@ -63,59 +67,113 @@ public class WasteRecordServiceImpl implements WasteRecordService {
         wasteRecord.setEconomicLoss(economicLoss);
         wasteRecord.setNotes(request.notes());
 
-        WasteRecord savedWasteRecord = wasteRecordRepository.save(wasteRecord);
+        WasteRecord saved = wasteRecordRepository.save(wasteRecord);
 
+        // Descontar stock del lote
         batch.setCurrentQuantity(batch.getCurrentQuantity().subtract(request.quantity()));
-
         if (batch.getCurrentQuantity().compareTo(BigDecimal.ZERO) == 0) {
             batch.setBatchStatus(BatchStatus.DEPLETED);
         }
-
         inventoryBatchRepository.save(batch);
 
+        // Movimiento de stock tipo WASTE
         StockMovement movement = new StockMovement();
         movement.setProduct(product);
         movement.setBatch(batch);
         movement.setUser(user);
         movement.setMovementType(StockMovementType.WASTE);
         movement.setQuantity(request.quantity());
-        movement.setRelatedWasteRecordId(savedWasteRecord.getId());
+        movement.setRelatedWasteRecordId(saved.getId());
         movement.setNotes("Descuento por merma. Motivo: " + request.reason());
-
         stockMovementRepository.save(movement);
 
-        return WasteRecordMapper.toResponse(savedWasteRecord);
+        return WasteRecordMapper.toResponse(saved);
     }
+
+    // ── FIND ALL (con filtros) ─────────────────────────────────────────────────
 
     @Override
     @Transactional(readOnly = true)
-    public List<WasteRecordResponse> findAll() {
-        return wasteRecordRepository.findAll()
-                .stream()
+    public List<WasteRecordResponse> findAll(
+            LocalDate from,
+            LocalDate to,
+            Long categoryId,
+            Long supplierId,
+            WasteReason reason
+    ) {
+        // Rango de fechas: si no se proveen, sin límite
+        LocalDateTime fromDt = from != null ? from.atStartOfDay() : null;
+        LocalDateTime toDt   = to   != null ? to.plusDays(1).atStartOfDay().minusNanos(1) : null;
+
+        // Validación básica de rango
+        if (fromDt != null && toDt != null && toDt.isBefore(fromDt)) {
+            throw new BadRequestException(
+                    "La fecha hasta no puede ser anterior a la fecha desde.");
+        }
+
+        List<WasteRecord> records;
+
+        if (fromDt != null && toDt != null) {
+            records = wasteRecordRepository.findByWasteDateBetween(fromDt, toDt);
+        } else {
+            records = wasteRecordRepository.findAll();
+        }
+
+        // Filtros adicionales en memoria (la tabla no es enorme en un MVP)
+        return records.stream()
+                .filter(r -> categoryId == null
+                        || (r.getProduct() != null
+                            && r.getProduct().getCategory() != null
+                            && r.getProduct().getCategory().getId().equals(categoryId)))
+                .filter(r -> supplierId == null || matchesSupplier(r, supplierId))
+                .filter(r -> reason == null || reason.equals(r.getReason()))
+                .sorted((a, b) -> b.getWasteDate().compareTo(a.getWasteDate())) // más recientes primero
                 .map(WasteRecordMapper::toResponse)
-                .toList();
+                .collect(Collectors.toList());
     }
+
+    // ── FIND BY ID ────────────────────────────────────────────────────────────
 
     @Override
     @Transactional(readOnly = true)
     public WasteRecordResponse findById(Long id) {
         WasteRecord wasteRecord = wasteRecordRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Merma no encontrada con id " + id));
-
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Merma no encontrada con id " + id));
         return WasteRecordMapper.toResponse(wasteRecord);
+    }
+
+    // ── HELPERS ───────────────────────────────────────────────────────────────
+
+    /**
+     * Verifica si la merma corresponde a un proveedor específico.
+     * Primero revisa el proveedor del lote; si es null, el del producto.
+     */
+    private boolean matchesSupplier(WasteRecord r, Long supplierId) {
+        // Proveedor del lote
+        if (r.getBatch() != null && r.getBatch().getSupplier() != null) {
+            return supplierId.equals(r.getBatch().getSupplier().getId());
+        }
+        // Proveedor por defecto del producto
+        if (r.getProduct() != null && r.getProduct().getDefaultSupplier() != null) {
+            return supplierId.equals(r.getProduct().getDefaultSupplier().getId());
+        }
+        return false;
     }
 
     private void validateWasteRequest(InventoryBatch batch, WasteRecordRequest request) {
         if (request.quantity().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BadRequestException("La cantidad de merma debe ser mayor a cero.");
+            throw new BadRequestException(
+                    "La cantidad de merma debe ser mayor a cero.");
         }
-
         if (batch.getCurrentQuantity().compareTo(request.quantity()) < 0) {
-            throw new BadRequestException("No se puede registrar una merma mayor al stock disponible del lote.");
+            throw new BadRequestException(
+                    "No se puede registrar una merma mayor al stock disponible del lote.");
         }
-
-        if (batch.getBatchStatus() == BatchStatus.DEPLETED || batch.getBatchStatus() == BatchStatus.DISCARDED) {
-            throw new BadRequestException("No se puede registrar merma sobre un lote sin stock disponible.");
+        if (batch.getBatchStatus() == BatchStatus.DEPLETED
+                || batch.getBatchStatus() == BatchStatus.DISCARDED) {
+            throw new BadRequestException(
+                    "No se puede registrar merma sobre un lote sin stock disponible.");
         }
     }
 }

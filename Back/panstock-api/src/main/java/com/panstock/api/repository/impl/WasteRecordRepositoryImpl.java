@@ -28,11 +28,12 @@ public class WasteRecordRepositoryImpl implements WasteRecordRepository {
 
     @Override
     public List<WasteRecord> findAll() {
-        return wasteRecordJpaRepository.findAll();
+        // Ordenado por fecha descendente para mostrar los más recientes primero
+        return wasteRecordJpaRepository.findAllByOrderByWasteDateDesc();
     }
 
     @Override
     public List<WasteRecord> findByWasteDateBetween(LocalDateTime from, LocalDateTime to) {
-        return wasteRecordJpaRepository.findByWasteDateBetweenOrderByWasteDateAsc(from, to);
+        return wasteRecordJpaRepository.findByWasteDateBetweenOrderByWasteDateDesc(from, to);
     }
 }
