@@ -12,7 +12,13 @@ public interface WasteRecordRepository {
 
     Optional<WasteRecord> findById(Long id);
 
+    /**
+     * Devuelve todos los registros de merma, ordenados por fecha descendente.
+     */
     List<WasteRecord> findAll();
 
+    /**
+     * Devuelve registros de merma dentro de un rango de fechas (para reportes).
+     */
     List<WasteRecord> findByWasteDateBetween(LocalDateTime from, LocalDateTime to);
 }

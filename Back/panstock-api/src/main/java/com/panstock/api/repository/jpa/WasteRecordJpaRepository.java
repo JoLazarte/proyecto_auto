@@ -8,7 +8,16 @@ import java.util.List;
 
 public interface WasteRecordJpaRepository extends JpaRepository<WasteRecord, Long> {
 
-    List<WasteRecord> findByWasteDateBetweenOrderByWasteDateAsc(
+    /**
+     * Todos los registros ordenados por fecha descendente (más recientes primero).
+     */
+    List<WasteRecord> findAllByOrderByWasteDateDesc();
+
+    /**
+     * Registros en un rango de fechas, ordenados por fecha descendente.
+     * Usado para filtros de período y para reportes.
+     */
+    List<WasteRecord> findByWasteDateBetweenOrderByWasteDateDesc(
             LocalDateTime from,
             LocalDateTime to
     );
