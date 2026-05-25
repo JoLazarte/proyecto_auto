@@ -21,4 +21,11 @@ public interface WasteRecordRepository {
      * Devuelve registros de merma dentro de un rango de fechas (para reportes).
      */
     List<WasteRecord> findByWasteDateBetween(LocalDateTime from, LocalDateTime to);
+
+    /**
+     * Búsqueda con todos los filtros opcionales: rango de fechas + createdById.
+     * Si from/to son null no se aplica filtro de fecha.
+     * Si createdById es null no se aplica filtro de usuario.
+     */
+    List<WasteRecord> search(LocalDateTime from, LocalDateTime to, Long createdById);
 }

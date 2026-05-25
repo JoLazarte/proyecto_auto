@@ -32,8 +32,7 @@ const handleResponse = async (res) => {
  *   params.categoryId  → número
  *   params.supplierId  → número
  *   params.reason      → WasteReason enum string
- *
- * Ambos roles (OWNER y EMPLOYEE) pueden acceder.
+ *   params.createdById → número (ID del usuario que registró)
  */
 export const fetchWasteRecords = createAsyncThunk(
   'waste/fetchAll',
@@ -45,6 +44,7 @@ export const fetchWasteRecords = createAsyncThunk(
       if (params.categoryId)  q.set('categoryId',  String(params.categoryId));
       if (params.supplierId)  q.set('supplierId',  String(params.supplierId));
       if (params.reason)      q.set('reason',      params.reason);
+      if (params.createdById) q.set('createdById', String(params.createdById));
 
       const qs = q.toString();
       return await fetch(`${BASE_URL}/api/waste-records${qs ? `?${qs}` : ''}`, {
@@ -58,8 +58,8 @@ export const fetchWasteRecords = createAsyncThunk(
 
 /**
  * POST /api/waste-records
- * Body: { batchId, userId?, quantity, reason, notes? }
- * Accesible por OWNER y EMPLOYEE.
+ * Body: { batchId, userId, quantity, reason, notes? }
+ * userId es REQUERIDO — identifica quién registró la merma.
  */
 export const createWasteRecord = createAsyncThunk(
   'waste/create',
@@ -69,6 +69,24 @@ export const createWasteRecord = createAsyncThunk(
         method: 'POST',
         headers: authHeaders(token),
         body: JSON.stringify(data),
+      }).then(handleResponse);
+    } catch (e) {
+      return rejectWithValue(e.message);
+    }
+  }
+);
+
+/**
+ * GET /users  — carga la lista de usuarios para el filtro "Registrado por".
+ * Solo el OWNER tiene acceso completo; el EMPLOYEE verá solo su propio registro
+ * igualmente porque el backend filtra por su userId en ese caso.
+ */
+export const fetchUsers = createAsyncThunk(
+  'waste/fetchUsers',
+  async ({ token }, { rejectWithValue }) => {
+    try {
+      return await fetch(`${BASE_URL}/users`, {
+        headers: authHeaders(token),
       }).then(handleResponse);
     } catch (e) {
       return rejectWithValue(e.message);
@@ -88,13 +106,18 @@ const wasteSlice = createSlice({
     actionError:  null,
     lastCreated:  null,
 
-    // Filtros activos (se persisten en memoria para mantener el estado al navegar)
+    // Lista de usuarios para el filtro (cargada solo si el usuario es OWNER)
+    users:        [],
+    usersStatus:  'idle',
+
+    // Filtros activos — persistidos en redux-persist para mantener estado
     activeFilters: {
       from:        '',
       to:          '',
       categoryId:  '',
       supplierId:  '',
       reason:      '',
+      createdById: '',   // NUEVO: filtro por usuario
     },
   },
   reducers: {
@@ -108,7 +131,7 @@ const wasteSlice = createSlice({
     },
     clearWasteFilters(state) {
       state.activeFilters = {
-        from: '', to: '', categoryId: '', supplierId: '', reason: '',
+        from: '', to: '', categoryId: '', supplierId: '', reason: '', createdById: '',
       };
     },
   },
@@ -123,10 +146,19 @@ const wasteSlice = createSlice({
       .addCase(createWasteRecord.fulfilled, (s, a) => {
         s.actionStatus = 'succeeded';
         s.lastCreated  = a.payload;
-        // Agregar al inicio de la lista
         if (s.items) s.items.unshift(a.payload);
       })
       .addCase(createWasteRecord.rejected,  (s, a) => { s.actionStatus = 'failed'; s.actionError = a.payload; });
+
+    builder
+      .addCase(fetchUsers.pending,   (s) => { s.usersStatus = 'loading'; })
+      .addCase(fetchUsers.fulfilled, (s, a) => {
+        s.usersStatus = 'succeeded';
+        // La respuesta de GET /users es una Page<User>; extraemos el content
+        const raw = a.payload;
+        s.users = Array.isArray(raw) ? raw : (raw?.content ?? []);
+      })
+      .addCase(fetchUsers.rejected,  (s) => { s.usersStatus = 'failed'; });
   },
 });
 
@@ -142,6 +174,8 @@ export const selectWasteRecords     = (s) => s.waste.items;
 export const selectWasteListStatus  = (s) => s.waste.listStatus;
 export const selectWasteListError   = (s) => s.waste.listError;
 export const selectWasteFilters     = (s) => s.waste.activeFilters;
+export const selectWasteUsers       = (s) => s.waste.users;
+export const selectWasteUsersStatus = (s) => s.waste.usersStatus;
 export const selectWasteAction      = (s) => ({
   status:      s.waste.actionStatus,
   error:       s.waste.actionError,

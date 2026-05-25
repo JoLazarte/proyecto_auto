@@ -21,11 +21,12 @@ import java.util.List;
  * POST /api/waste-records               → registrar merma
  *
  * Filtros opcionales en GET /api/waste-records:
- *   ?from=YYYY-MM-DD    → fecha desde (inclusive)
- *   ?to=YYYY-MM-DD      → fecha hasta (inclusive)
- *   ?categoryId=N       → filtra por categoría del producto
- *   ?supplierId=N       → filtra por proveedor del lote
- *   ?reason=EXPIRED     → filtra por motivo (enum WasteReason)
+ *   ?from=YYYY-MM-DD      → fecha desde (inclusive)
+ *   ?to=YYYY-MM-DD        → fecha hasta (inclusive)
+ *   ?categoryId=N         → filtra por categoría del producto
+ *   ?supplierId=N         → filtra por proveedor del lote
+ *   ?reason=EXPIRED       → filtra por motivo (enum WasteReason)
+ *   ?createdById=N        → filtra por usuario que registró la merma
  */
 @RestController
 @RequestMapping("/api/waste-records")
@@ -50,9 +51,12 @@ public class WasteRecordController {
 
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) Long supplierId,
-            @RequestParam(required = false) WasteReason reason
+            @RequestParam(required = false) WasteReason reason,
+
+            // NUEVO: filtro por usuario que registró la merma
+            @RequestParam(required = false) Long createdById
     ) {
-        return wasteRecordService.findAll(from, to, categoryId, supplierId, reason);
+        return wasteRecordService.findAll(from, to, categoryId, supplierId, reason, createdById);
     }
 
     @GetMapping("/{id}")

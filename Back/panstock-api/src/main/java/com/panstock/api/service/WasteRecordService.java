@@ -18,18 +18,20 @@ public interface WasteRecordService {
     /**
      * Lista mermas con filtros opcionales:
      *
-     * @param from        fecha desde (inclusive, en zona local)
-     * @param to          fecha hasta (inclusive, en zona local)
-     * @param categoryId  filtra por categoría del producto
-     * @param supplierId  filtra por proveedor del lote o del producto
-     * @param reason      filtra por motivo de merma
+     * @param from         fecha desde (inclusive, en zona local)
+     * @param to           fecha hasta (inclusive, en zona local)
+     * @param categoryId   filtra por categoría del producto
+     * @param supplierId   filtra por proveedor del lote o del producto
+     * @param reason       filtra por motivo de merma
+     * @param createdById  filtra por usuario que registró la merma
      */
     List<WasteRecordResponse> findAll(
             LocalDate from,
             LocalDate to,
             Long categoryId,
             Long supplierId,
-            WasteReason reason
+            WasteReason reason,
+            Long createdById
     );
 
     WasteRecordResponse findById(Long id);

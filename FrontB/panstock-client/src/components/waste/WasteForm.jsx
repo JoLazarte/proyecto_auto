@@ -83,7 +83,6 @@ function SuccessView({ record, registeredBy, onNew, onClose }) {
         )}
       </p>
 
-      {/* Quién registró */}
       {registeredBy && (
         <div className="wf-success-author">
           <span className="wf-success-avatar">
@@ -96,12 +95,8 @@ function SuccessView({ record, registeredBy, onNew, onClose }) {
       <span className="wf-success-badge">Registro #{record?.id}</span>
 
       <div className="wf-success-actions">
-        <button className="wf-btn-sec" onClick={onClose}>
-          Volver
-        </button>
-        <button className="wf-btn-pri" onClick={onNew}>
-          + Otra merma
-        </button>
+        <button className="wf-btn-sec" onClick={onClose}>Volver</button>
+        <button className="wf-btn-pri" onClick={onNew}>+ Otra merma</button>
       </div>
 
       <style>{`
@@ -212,6 +207,15 @@ export default function WasteForm({ onSuccess, onCancel }) {
     return qty * Number(price);
   }, [selectedBatch, form.quantity]);
 
+  // Nombre completo del usuario autenticado
+  const fullName = useMemo(() => {
+    if (!user) return null;
+    const first = user.firstName || '';
+    const last  = user.lastName  || '';
+    if (first && last) return `${first} ${last}`;
+    return first || last || user.username || null;
+  }, [user]);
+
   // ── Validación ────────────────────────────────────────────────────────────
   const validate = () => {
     const e = {};
@@ -235,12 +239,18 @@ export default function WasteForm({ onSuccess, onCancel }) {
     const errs = validate();
     if (Object.keys(errs).length) { setFE(errs); return; }
 
+    // Validación crítica: necesitamos el id del usuario autenticado
+    if (!user?.id) {
+      setFE({ _global: 'No se pudo identificar al usuario. Por favor, cerrá sesión y volvé a ingresar.' });
+      return;
+    }
+
     dispatch(
       createWasteRecord({
         token,
         data: {
           batchId:  Number(form.batchId),
-          userId:   user?.id ?? null,   // siempre enviamos el usuario autenticado
+          userId:   user.id,        // SIEMPRE enviamos el usuario autenticado
           quantity: Number(form.quantity),
           reason:   form.reason,
           notes:    form.notes.trim() || null,
@@ -263,12 +273,6 @@ export default function WasteForm({ onSuccess, onCancel }) {
 
   const isLoading = status === 'loading';
 
-  // Nombre completo del usuario logueado
-  const fullName =
-    user?.firstName && user?.lastName
-      ? `${user.firstName} ${user.lastName}`
-      : user?.firstName || user?.username || null;
-
   // ── Success screen ─────────────────────────────────────────────────────────
   if (showSuccess) {
     return (
@@ -283,10 +287,13 @@ export default function WasteForm({ onSuccess, onCancel }) {
 
   return (
     <form onSubmit={handleSubmit} noValidate className="wf-form">
-      {error && <Alert type="error">{error}</Alert>}
+      {/* Error global (ej: usuario no identificado) */}
+      {(error || fieldErrors._global) && (
+        <Alert type="error">{error || fieldErrors._global}</Alert>
+      )}
 
-      {/* Quién está registrando — siempre visible */}
-      {fullName && (
+      {/* Quién está registrando — siempre visible y destacado */}
+      {fullName ? (
         <div className="wf-author-banner">
           <div className="wf-author-avatar">
             {fullName.charAt(0).toUpperCase()}
@@ -296,10 +303,15 @@ export default function WasteForm({ onSuccess, onCancel }) {
             <span className="wf-author-name">
               {fullName}
               <span className="wf-author-role">
-                {user?.role === 'OWNER' ? ' · 👑 Dueño' : ' · 👤 Empleado'}
+                {user?.role === 'OWNER' ? ' · 👑 Dueño/a' : ' · 👤 Empleado/a'}
               </span>
             </span>
           </div>
+          <div className="wf-author-id">ID #{user?.id}</div>
+        </div>
+      ) : (
+        <div className="wf-author-error">
+          ⚠️ No se pudo identificar al usuario. Cerrá sesión y volvé a ingresar.
         </div>
       )}
 
@@ -317,6 +329,10 @@ export default function WasteForm({ onSuccess, onCancel }) {
       <Field label="Lote a descartar" required error={fieldErrors.batchId}>
         {batchesSt === 'loading' ? (
           <div className="wf-loading-sel">Cargando lotes disponibles...</div>
+        ) : availableBatches.length === 0 ? (
+          <div className="wf-loading-sel" style={{ color: 'var(--warm-gray)' }}>
+            No hay lotes disponibles con stock.
+          </div>
         ) : (
           <select
             className={`wf-select ${fieldErrors.batchId ? 'err' : ''}`}
@@ -469,7 +485,7 @@ export default function WasteForm({ onSuccess, onCancel }) {
         <button
           type="submit"
           className="wf-submit"
-          disabled={isLoading || !form.batchId}
+          disabled={isLoading || !form.batchId || !user?.id}
         >
           {isLoading ? (
             <>
@@ -492,18 +508,25 @@ export default function WasteForm({ onSuccess, onCancel }) {
           border: 1px solid rgba(200,137,58,0.2);
         }
         .wf-author-avatar {
-          width: 32px; height: 32px; border-radius: 50%;
+          width: 34px; height: 34px; border-radius: 50%;
           background: var(--amber); color: white;
           display: flex; align-items: center; justify-content: center;
-          font-size: 0.85rem; font-weight: 700; flex-shrink: 0;
+          font-size: 0.9rem; font-weight: 700; flex-shrink: 0;
         }
-        .wf-author-info { display: flex; flex-direction: column; gap: 1px; }
+        .wf-author-info { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
         .wf-author-label {
           font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.07em;
           color: var(--warm-gray-light); font-weight: 600;
         }
-        .wf-author-name  { font-size: 0.88rem; font-weight: 600; color: var(--espresso); }
+        .wf-author-name  { font-size: 0.88rem; font-weight: 700; color: var(--espresso); }
         .wf-author-role  { font-weight: 400; color: var(--warm-gray); }
+        .wf-author-id    { font-size: 0.7rem; color: var(--warm-gray-light); flex-shrink: 0; }
+
+        .wf-author-error {
+          padding: 10px 14px; border-radius: var(--radius-md);
+          background: var(--error-light); border: 1px solid var(--error);
+          color: var(--error); font-size: 0.82rem; font-weight: 500;
+        }
 
         /* Info banner */
         .wf-info-banner {
