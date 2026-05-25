@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   fetchWasteRecords,
-  createWasteRecord,        // re-exported for WasteForm
   selectWasteRecords,
   selectWasteListStatus,
   selectWasteListError,
@@ -10,11 +9,12 @@ import {
   setWasteFilters,
   clearWasteFilters,
   clearWasteActionState,
+  fetchUsers,
+  selectWasteUsers,
+  selectWasteUsersStatus,
 } from '../features/waste/wasteSlice';
 import {
   fetchBatches,
-  selectBatches,
-  selectBatchesStatus,
 } from '../features/stock/stockSlice';
 import { fetchCategories, selectCategories } from '../features/catalog/categoriesSlice';
 import { fetchSuppliers, selectSuppliers }   from '../features/catalog/suppliersSlice';
@@ -37,7 +37,7 @@ const QUICK_RANGES = [
   { label: 'Hoy',        days: 0  },
   { label: 'Últimos 7d', days: 7  },
   { label: 'Últimos 30d',days: 30 },
-  { label: 'Este mes',   days: -1 }, // special: month-to-date
+  { label: 'Este mes',   days: -1 },
 ];
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
@@ -75,7 +75,6 @@ function ReasonBadge({ reason }) {
   );
 }
 
-/** Tarjeta de estadística en el panel de resumen */
 function StatCard({ label, value, color, sub }) {
   return (
     <div className="stat-card">
@@ -88,7 +87,6 @@ function StatCard({ label, value, color, sub }) {
   );
 }
 
-/** Barra de desglose horizontal (para categoría/proveedor) */
 function BreakdownBar({ items, total, colorFn }) {
   if (!items.length) return <p style={{ color: 'var(--warm-gray)', fontSize: '0.84rem' }}>Sin datos</p>;
   return (
@@ -129,14 +127,12 @@ function WasteRow({ record, idx }) {
 
   return (
     <div className="wr-wrap" style={{ animationDelay: `${idx * 0.025}s` }}>
-      {/* Row principal */}
       <div
         className={`wr-row ${expanded ? 'open' : ''}`}
         onClick={() => setExpanded((v) => !v)}
         role="button"
         aria-expanded={expanded}
       >
-        {/* Indicador de color por motivo */}
         <div className="wr-indicator" style={{ background: cfg.color }} />
 
         <div className="wr-body">
@@ -164,7 +160,7 @@ function WasteRow({ record, idx }) {
             >
               {formatARS(record.economicLoss)}
             </span>
-            {/* ── Quién registró ── */}
+            {/* ── Quién registró — siempre visible ── */}
             {record.createdByName ? (
               <span className="wr-author">
                 <span className="wr-author-avatar">
@@ -173,14 +169,13 @@ function WasteRow({ record, idx }) {
                 {record.createdByName}
               </span>
             ) : (
-              <span className="wr-author wr-author-unknown">Sin asignar</span>
+              <span className="wr-author wr-author-unknown">Sin usuario asignado</span>
             )}
             <span className="wr-expand-icon">{expanded ? '▲' : '▼'}</span>
           </div>
         </div>
       </div>
 
-      {/* Panel expandido */}
       {expanded && (
         <div className="wr-detail">
           <div className="wr-detail-grid">
@@ -208,7 +203,14 @@ function WasteRow({ record, idx }) {
             </div>
             <div className="wrd-item">
               <span className="wrd-label">Registrado por</span>
-              <span>{record.createdByName || '—'}</span>
+              <span style={{ fontWeight: 600, color: 'var(--espresso)' }}>
+                {record.createdByName || '—'}
+                {record.createdById && (
+                  <span style={{ color: 'var(--warm-gray)', fontWeight: 400, fontSize: '0.78rem' }}>
+                    {' '}(ID #{record.createdById})
+                  </span>
+                )}
+              </span>
             </div>
           </div>
           {record.notes && (
@@ -223,44 +225,53 @@ function WasteRow({ record, idx }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function WastePage() {
-  const dispatch   = useDispatch();
-  const token      = useSelector(selectToken);
-  const user       = useSelector(selectUser);
-  const records    = useSelector(selectWasteRecords);
-  const listStatus = useSelector(selectWasteListStatus);
-  const listError  = useSelector(selectWasteListError);
-  const filters    = useSelector(selectWasteFilters);
-  const categories = useSelector(selectCategories);
-  const suppliers  = useSelector(selectSuppliers);
+  const dispatch    = useDispatch();
+  const token       = useSelector(selectToken);
+  const authUser    = useSelector(selectUser);
+  const records     = useSelector(selectWasteRecords);
+  const listStatus  = useSelector(selectWasteListStatus);
+  const listError   = useSelector(selectWasteListError);
+  const filters     = useSelector(selectWasteFilters);
+  const categories  = useSelector(selectCategories);
+  const suppliers   = useSelector(selectSuppliers);
+  const wasteUsers  = useSelector(selectWasteUsers);
+  const usersStatus = useSelector(selectWasteUsersStatus);
 
-  const [modalOpen,    setModalOpen]    = useState(false);
-  const [search,       setSearch]       = useState('');
-  const [activeView,   setActiveView]   = useState('list'); // 'list' | 'stats'
-  const [filtersOpen,  setFiltersOpen]  = useState(false);
+  const isOwner = authUser?.role === 'OWNER';
+
+  const [modalOpen,   setModalOpen]   = useState(false);
+  const [search,      setSearch]      = useState('');
+  const [activeView,  setActiveView]  = useState('list');
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // ── Initial load ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!token) return;
-    // Cargar mermas con los filtros activos (pueden estar en Redux de sesión anterior)
     loadRecords();
-    // Catálogos necesarios para los filtros
     dispatch(fetchCategories({ token, activeOnly: false }));
     dispatch(fetchSuppliers({ token, params: {} }));
-    // Lotes necesarios para el formulario
     dispatch(fetchBatches({ token }));
+    // Solo el OWNER puede ver todos los usuarios
+    if (isOwner && usersStatus === 'idle') {
+      dispatch(fetchUsers({ token }));
+    }
   }, [token]); // eslint-disable-line
 
-  const loadRecords = useCallback(() => {
+  const buildParams = useCallback(() => {
     const params = {};
-    if (filters.from)       params.from       = filters.from;
-    if (filters.to)         params.to         = filters.to;
-    if (filters.categoryId) params.categoryId = filters.categoryId;
-    if (filters.supplierId) params.supplierId = filters.supplierId;
-    if (filters.reason)     params.reason     = filters.reason;
-    dispatch(fetchWasteRecords({ token, params }));
-  }, [dispatch, token, filters]);
+    if (filters.from)        params.from        = filters.from;
+    if (filters.to)          params.to          = filters.to;
+    if (filters.categoryId)  params.categoryId  = filters.categoryId;
+    if (filters.supplierId)  params.supplierId  = filters.supplierId;
+    if (filters.reason)      params.reason      = filters.reason;
+    if (filters.createdById) params.createdById = filters.createdById;
+    return params;
+  }, [filters]);
 
-  // ── Aplicar filtros ───────────────────────────────────────────────────────
+  const loadRecords = useCallback(() => {
+    dispatch(fetchWasteRecords({ token, params: buildParams() }));
+  }, [dispatch, token, buildParams]);
+
   const applyFilters = () => {
     loadRecords();
     setFiltersOpen(false);
@@ -272,14 +283,11 @@ export default function WastePage() {
     setFiltersOpen(false);
   };
 
-  // ── Quick ranges ──────────────────────────────────────────────────────────
   const applyQuickRange = (days) => {
     const today = new Date();
     const to = isoDate(today);
     let from;
-
     if (days === -1) {
-      // Este mes
       from = isoDate(new Date(today.getFullYear(), today.getMonth(), 1));
     } else if (days === 0) {
       from = to;
@@ -288,12 +296,12 @@ export default function WastePage() {
       d.setDate(d.getDate() - days);
       from = isoDate(d);
     }
-
+    const newFilters = { ...filters, from, to };
     dispatch(setWasteFilters({ from, to }));
-    dispatch(fetchWasteRecords({ token, params: { ...filters, from, to } }));
+    dispatch(fetchWasteRecords({ token, params: { ...newFilters } }));
   };
 
-  // ── Búsqueda local (sin nueva petición) ──────────────────────────────────
+  // ── Búsqueda local ────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     if (!search.trim()) return records;
     const q = search.trim().toLowerCase();
@@ -307,74 +315,65 @@ export default function WastePage() {
     );
   }, [records, search]);
 
-  // ── Estadísticas calculadas del conjunto filtrado ─────────────────────────
+  // ── Estadísticas ──────────────────────────────────────────────────────────
   const stats = useMemo(() => {
     const totalQty  = filtered.reduce((s, r) => s + Number(r.quantity       || 0), 0);
     const totalLoss = filtered.reduce((s, r) => s + Number(r.economicLoss   || 0), 0);
     const count     = filtered.length;
 
-    // Por categoría
-    const byCat = {};
-    filtered.forEach((r) => {
-      const key  = r.categoryId   || 'sin-cat';
-      const name = r.categoryName || 'Sin categoría';
-      if (!byCat[key]) byCat[key] = { name, loss: 0, qty: 0, count: 0 };
-      byCat[key].loss  += Number(r.economicLoss || 0);
-      byCat[key].qty   += Number(r.quantity     || 0);
-      byCat[key].count += 1;
-    });
-    const catItems = Object.values(byCat).sort((a, b) => b.loss - a.loss);
+    const accumulate = (keyFn, nameFn, items) => {
+      const map = {};
+      items.forEach((r) => {
+        const key  = keyFn(r);
+        const name = nameFn(r);
+        if (!map[key]) map[key] = { name, loss: 0, qty: 0, count: 0 };
+        map[key].loss  += Number(r.economicLoss || 0);
+        map[key].qty   += Number(r.quantity     || 0);
+        map[key].count += 1;
+      });
+      return Object.values(map).sort((a, b) => b.loss - a.loss);
+    };
 
-    // Por proveedor
-    const bySupp = {};
-    filtered.forEach((r) => {
-      const key  = r.supplierId   || 'sin-prov';
-      const name = r.supplierName || 'Sin proveedor';
-      if (!bySupp[key]) bySupp[key] = { name, loss: 0, qty: 0, count: 0 };
-      bySupp[key].loss  += Number(r.economicLoss || 0);
-      bySupp[key].qty   += Number(r.quantity     || 0);
-      bySupp[key].count += 1;
-    });
-    const suppItems = Object.values(bySupp).sort((a, b) => b.loss - a.loss);
-
-    // Por motivo
-    const byReason = {};
-    filtered.forEach((r) => {
-      const key  = r.reason || 'OTHER';
-      if (!byReason[key]) byReason[key] = { name: REASON_CONFIG[key]?.label || key, loss: 0, qty: 0, count: 0 };
-      byReason[key].loss  += Number(r.economicLoss || 0);
-      byReason[key].qty   += Number(r.quantity     || 0);
-      byReason[key].count += 1;
-    });
-    const reasonItems = Object.values(byReason).sort((a, b) => b.loss - a.loss);
-
-    // Por usuario
-    const byUser = {};
-    filtered.forEach((r) => {
-      const key  = r.createdById   || 'anon';
-      const name = r.createdByName || 'Sin asignar';
-      if (!byUser[key]) byUser[key] = { name, loss: 0, qty: 0, count: 0 };
-      byUser[key].loss  += Number(r.economicLoss || 0);
-      byUser[key].qty   += Number(r.quantity     || 0);
-      byUser[key].count += 1;
-    });
-    const userItems = Object.values(byUser).sort((a, b) => b.count - a.count);
+    const catItems    = accumulate(
+      (r) => r.categoryId   || 'sin-cat',
+      (r) => r.categoryName || 'Sin categoría',
+      filtered
+    );
+    const suppItems   = accumulate(
+      (r) => r.supplierId   || 'sin-prov',
+      (r) => r.supplierName || 'Sin proveedor',
+      filtered
+    );
+    const reasonItems = accumulate(
+      (r) => r.reason || 'OTHER',
+      (r) => REASON_CONFIG[r.reason]?.label || r.reason || 'Otro',
+      filtered
+    );
+    const userItems   = Object.values(
+      filtered.reduce((map, r) => {
+        const key  = r.createdById   || 'anon';
+        const name = r.createdByName || 'Sin asignar';
+        if (!map[key]) map[key] = { name, loss: 0, qty: 0, count: 0 };
+        map[key].loss  += Number(r.economicLoss || 0);
+        map[key].qty   += Number(r.quantity     || 0);
+        map[key].count += 1;
+        return map;
+      }, {})
+    ).sort((a, b) => b.count - a.count);
 
     return { count, totalQty, totalLoss, catItems, suppItems, reasonItems, userItems };
   }, [filtered]);
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
   const handleFormSuccess = () => {
     setModalOpen(false);
     loadRecords();
-    // También refrescar lotes para que el formulario tenga stock actualizado
     dispatch(fetchBatches({ token }));
   };
 
   const hasFilters = filters.from || filters.to || filters.categoryId
-                  || filters.supplierId || filters.reason;
+                  || filters.supplierId || filters.reason || filters.createdById;
 
-  const isLoading  = listStatus === 'loading';
+  const isLoading = listStatus === 'loading';
 
   const CAT_COLORS  = ['#C8893A','#D4A853','#8B6914','#5C8A4A','#4A7A8A','#7A5C8A'];
   const SUPP_COLORS = ['#1565C0','#2E7D32','#6A1B9A','#0097A7','#E65100','#558B2F'];
@@ -400,10 +399,11 @@ export default function WastePage() {
 
           <div className="wp-header-actions">
             <button
-              className={`wp-btn-icon ${isLoading ? 'spin-anim' : ''}`}
+              className="wp-btn-icon"
               onClick={loadRecords}
               disabled={isLoading}
               title="Actualizar"
+              style={{ animation: isLoading ? 'spin 0.8s linear infinite' : 'none' }}
             >
               ↻
             </button>
@@ -520,6 +520,48 @@ export default function WastePage() {
                 </select>
               </div>
 
+              {/* Registrado por — visible para OWNER o para empleados (se filtra al propio usuario) */}
+              <div className="wp-filter-group">
+                <span className="wp-filter-group-label">👤 Registrado por</span>
+                {isOwner ? (
+                  /* OWNER: puede filtrar por cualquier usuario */
+                  <select
+                    className="wp-select"
+                    value={filters.createdById}
+                    onChange={(e) => dispatch(setWasteFilters({ createdById: e.target.value }))}
+                  >
+                    <option value="">Todos los usuarios</option>
+                    {usersStatus === 'loading' && (
+                      <option disabled>Cargando usuarios...</option>
+                    )}
+                    {wasteUsers.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.firstName} {u.lastName}
+                        {u.role === 'OWNER' ? ' 👑' : ' 👤'}
+                        {u.enabled === false ? ' (inactivo)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  /* EMPLOYEE: solo puede ver sus propias mermas */
+                  <div className="wp-employee-filter">
+                    <label className="wp-toggle-row">
+                      <input
+                        type="checkbox"
+                        className="wp-checkbox"
+                        checked={filters.createdById === String(authUser?.id)}
+                        onChange={(e) =>
+                          dispatch(setWasteFilters({
+                            createdById: e.target.checked ? String(authUser?.id) : '',
+                          }))
+                        }
+                      />
+                      <span>Ver solo mis registros</span>
+                    </label>
+                  </div>
+                )}
+              </div>
+
               {/* Botones */}
               <div className="wp-filter-actions">
                 <button className="wp-btn-ghost" onClick={handleClearFilters}>
@@ -538,13 +580,10 @@ export default function WastePage() {
           <div className="wp-error">⚠ {listError}</div>
         )}
 
-        {/* ── Resumen económico (siempre visible si hay datos) ── */}
+        {/* ── Resumen económico ── */}
         {(listStatus === 'succeeded' || records.length > 0) && (
           <div className="wp-summary-strip">
-            <StatCard
-              label="Registros"
-              value={stats.count}
-            />
+            <StatCard label="Registros" value={stats.count} />
             <div className="wp-summary-sep" />
             <StatCard
               label="Unidades perdidas"
@@ -581,7 +620,6 @@ export default function WastePage() {
         {/* ── Vista de lista ── */}
         {activeView === 'list' && (
           <>
-            {/* Búsqueda local */}
             {records.length > 0 && (
               <div className="wp-search-wrap">
                 <span className="wp-search-icon">🔍</span>
@@ -597,10 +635,8 @@ export default function WastePage() {
               </div>
             )}
 
-            {/* Loading */}
             {isLoading && <TableSkeleton rows={5} />}
 
-            {/* Empty — sin datos en absoluto */}
             {!isLoading && records.length === 0 && (
               <div className="wp-empty-cta">
                 <span className="wp-empty-icon">🗑️</span>
@@ -608,7 +644,7 @@ export default function WastePage() {
                 <p className="wp-empty-desc">
                   Registrá los productos vencidos, dañados o descartados
                   para mantener el inventario actualizado y calcular pérdidas económicas.
-                  {hasFilters && ' (Probá limpiando los filtros.)'}
+                  {hasFilters && ' Probá limpiando los filtros.'}
                 </p>
                 <button className="wp-btn-new" onClick={() => setModalOpen(true)}>
                   + Registrar primera merma
@@ -616,7 +652,6 @@ export default function WastePage() {
               </div>
             )}
 
-            {/* Empty — hay datos pero el buscador no encuentra */}
             {!isLoading && records.length > 0 && filtered.length === 0 && (
               <div className="wp-empty-search">
                 <span>🔍</span>
@@ -627,7 +662,6 @@ export default function WastePage() {
               </div>
             )}
 
-            {/* Lista de mermas */}
             {!isLoading && filtered.length > 0 && (
               <div className="wp-list">
                 {filtered.map((r, i) => (
@@ -648,47 +682,24 @@ export default function WastePage() {
         {/* ── Vista de estadísticas ── */}
         {activeView === 'stats' && records.length > 0 && (
           <div className="wp-stats">
-
-            {/* Por categoría */}
             <div className="wp-stats-card">
               <h3 className="wp-stats-title">📂 Pérdidas por categoría</h3>
-              <BreakdownBar
-                items={stats.catItems}
-                total={stats.totalLoss}
-                colorFn={(i) => CAT_COLORS[i % CAT_COLORS.length]}
-              />
+              <BreakdownBar items={stats.catItems} total={stats.totalLoss} colorFn={(i) => CAT_COLORS[i % CAT_COLORS.length]} />
             </div>
-
-            {/* Por proveedor */}
             <div className="wp-stats-card">
               <h3 className="wp-stats-title">🚚 Pérdidas por proveedor</h3>
-              <BreakdownBar
-                items={stats.suppItems}
-                total={stats.totalLoss}
-                colorFn={(i) => SUPP_COLORS[i % SUPP_COLORS.length]}
-              />
+              <BreakdownBar items={stats.suppItems} total={stats.totalLoss} colorFn={(i) => SUPP_COLORS[i % SUPP_COLORS.length]} />
             </div>
-
-            {/* Por motivo */}
             <div className="wp-stats-card">
               <h3 className="wp-stats-title">⚠️ Pérdidas por motivo</h3>
-              <BreakdownBar
-                items={stats.reasonItems}
-                total={stats.totalLoss}
-                colorFn={(i) => Object.values(REASON_CONFIG)[i % 5]?.color || '#888'}
-              />
+              <BreakdownBar items={stats.reasonItems} total={stats.totalLoss} colorFn={(i) => Object.values(REASON_CONFIG)[i % 5]?.color || '#888'} />
             </div>
-
-            {/* Por usuario */}
             <div className="wp-stats-card">
               <h3 className="wp-stats-title">👤 Registros por usuario</h3>
               <div className="user-stats-list">
                 {stats.userItems.map((u, i) => (
                   <div key={i} className="user-stat-row">
-                    <div
-                      className="user-stat-avatar"
-                      style={{ background: USER_COLORS[i % USER_COLORS.length] }}
-                    >
+                    <div className="user-stat-avatar" style={{ background: USER_COLORS[i % USER_COLORS.length] }}>
                       {u.name.charAt(0).toUpperCase()}
                     </div>
                     <div className="user-stat-info">
@@ -696,9 +707,7 @@ export default function WastePage() {
                       <span className="user-stat-detail">
                         {u.count} registro{u.count !== 1 ? 's' : ''} ·{' '}
                         {Number(u.qty).toLocaleString('es-AR')} u. ·{' '}
-                        <span style={{ color: '#C0392B', fontWeight: 700 }}>
-                          {formatARS(u.loss)}
-                        </span>
+                        <span style={{ color: '#C0392B', fontWeight: 700 }}>{formatARS(u.loss)}</span>
                       </span>
                     </div>
                     <div className="user-stat-bar-wrap">
@@ -714,7 +723,6 @@ export default function WastePage() {
                 ))}
               </div>
             </div>
-
           </div>
         )}
 
@@ -739,9 +747,7 @@ export default function WastePage() {
         />
       </Modal>
 
-      {/* ── Styles ── */}
       <style>{`
-        /* Page shell */
         .wp-page    { min-height: 100vh; background: var(--cream); }
         .wp-content {
           max-width: 860px; margin: 0 auto;
@@ -749,13 +755,9 @@ export default function WastePage() {
           display: flex; flex-direction: column; gap: var(--space-md);
         }
 
-        /* Header */
-        .wp-header {
-          display: flex; align-items: flex-start;
-          justify-content: space-between; gap: 12px; flex-wrap: wrap;
-        }
-        .wp-title { font-family: var(--font-display); font-size: 1.7rem; font-weight: 700; color: var(--espresso); margin-bottom: 4px; }
-        .wp-sub   { font-size: 0.84rem; color: var(--warm-gray); }
+        .wp-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+        .wp-title  { font-family: var(--font-display); font-size: 1.7rem; font-weight: 700; color: var(--espresso); margin-bottom: 4px; }
+        .wp-sub    { font-size: 0.84rem; color: var(--warm-gray); }
         .wp-header-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
 
         .wp-btn-icon {
@@ -767,7 +769,6 @@ export default function WastePage() {
         }
         .wp-btn-icon:hover:not(:disabled) { border-color: #C0392B; color: #C0392B; }
         .wp-btn-icon:disabled { opacity: 0.5; cursor: not-allowed; }
-        .wp-btn-icon.spin-anim { animation: spin 0.8s linear infinite; }
 
         .wp-btn-new {
           padding: 10px 18px; background: #C0392B; color: white;
@@ -776,12 +777,9 @@ export default function WastePage() {
           cursor: pointer; transition: all var(--transition-fast);
           box-shadow: 0 4px 14px rgba(192,57,43,0.22); white-space: nowrap;
         }
-        .wp-btn-new:hover { filter: brightness(1.08); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(192,57,43,0.3); }
+        .wp-btn-new:hover { filter: brightness(1.08); transform: translateY(-1px); }
 
-        /* Quick ranges */
-        .wp-quick-ranges {
-          display: flex; flex-wrap: wrap; gap: 7px;
-        }
+        .wp-quick-ranges { display: flex; flex-wrap: wrap; gap: 7px; }
         .wp-range-chip {
           padding: 6px 14px; border-radius: 20px;
           border: 1.5px solid var(--cream-dark); background: white;
@@ -793,7 +791,6 @@ export default function WastePage() {
         .wp-range-chip.clear { border-color: rgba(192,57,43,0.4); color: #C0392B; background: rgba(192,57,43,0.05); }
         .wp-range-chip.clear:hover { background: rgba(192,57,43,0.1); }
 
-        /* Filters panel */
         .wp-filters-panel {
           border: 1.5px solid var(--cream-dark); border-radius: var(--radius-lg);
           background: white; overflow: hidden;
@@ -808,7 +805,8 @@ export default function WastePage() {
         .wp-filters-toggle:hover { background: var(--cream); }
         .wp-filters-badge {
           padding: 2px 8px; border-radius: 10px; font-size: 0.65rem; font-weight: 700;
-          background: rgba(192,57,43,0.10); color: #C0392B; text-transform: uppercase; letter-spacing: 0.05em;
+          background: rgba(192,57,43,0.10); color: #C0392B;
+          text-transform: uppercase; letter-spacing: 0.05em;
         }
         .wp-filters-chevron { margin-left: auto; font-size: 0.7rem; color: var(--warm-gray); }
 
@@ -819,8 +817,8 @@ export default function WastePage() {
         }
         .wp-filter-group { display: flex; flex-direction: column; gap: 6px; }
         .wp-filter-group-label {
-          font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
-          letter-spacing: 0.08em; color: var(--warm-gray);
+          font-size: 0.72rem; font-weight: 700;
+          text-transform: uppercase; letter-spacing: 0.08em; color: var(--warm-gray);
         }
         .wp-filter-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .wp-filter-field { display: flex; flex-direction: column; gap: 4px; }
@@ -834,6 +832,17 @@ export default function WastePage() {
           transition: border-color var(--transition-base);
         }
         .wp-date-input:focus, .wp-select:focus { border-color: #C0392B; background: #fff; }
+
+        /* Filtro de "mis registros" para EMPLOYEE */
+        .wp-employee-filter {
+          padding: 10px 12px; border-radius: var(--radius-md);
+          background: var(--cream); border: 1.5px solid var(--cream-dark);
+        }
+        .wp-toggle-row {
+          display: flex; align-items: center; gap: 8px;
+          cursor: pointer; font-size: 0.88rem; color: var(--espresso); font-weight: 500;
+        }
+        .wp-checkbox { width: 17px; height: 17px; accent-color: #C0392B; cursor: pointer; }
 
         .wp-filter-actions { display: flex; gap: 8px; justify-content: flex-end; padding-top: 4px; }
         .wp-btn-ghost {
@@ -851,14 +860,12 @@ export default function WastePage() {
         }
         .wp-btn-apply:hover { filter: brightness(1.08); }
 
-        /* Error */
         .wp-error {
           padding: 12px 16px; background: var(--error-light);
           border: 1px solid var(--error); border-radius: var(--radius-md);
           color: var(--error); font-size: 0.88rem;
         }
 
-        /* Summary strip */
         .wp-summary-strip {
           display: flex; align-items: stretch;
           background: white; border: 1px solid var(--cream-dark);
@@ -866,7 +873,6 @@ export default function WastePage() {
           box-shadow: var(--shadow-sm); gap: 0;
         }
         .wp-summary-sep { width: 1px; background: var(--cream-dark); flex-shrink: 0; margin: 0 4px; }
-
         .stat-card {
           flex: 1; display: flex; flex-direction: column;
           align-items: center; gap: 3px; padding: 0 8px; text-align: center;
@@ -876,12 +882,11 @@ export default function WastePage() {
           text-transform: uppercase; letter-spacing: 0.07em; line-height: 1;
         }
         .stat-card-value {
-          font-family: var(--font-display); font-size: 1.3rem; font-weight: 700;
-          color: var(--espresso); line-height: 1.1;
+          font-family: var(--font-display); font-size: 1.3rem;
+          font-weight: 700; color: var(--espresso); line-height: 1.1;
         }
         .stat-card-sub { font-size: 0.68rem; color: var(--warm-gray-light); }
 
-        /* Tabs */
         .wp-tabs {
           display: flex; background: var(--cream-dark);
           border-radius: var(--radius-md); padding: 3px; align-self: flex-start;
@@ -894,7 +899,6 @@ export default function WastePage() {
         }
         .wp-tab.active { background: white; color: var(--espresso); box-shadow: var(--shadow-sm); }
 
-        /* Search */
         .wp-search-wrap { position: relative; }
         .wp-search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 0.85rem; pointer-events: none; }
         .wp-search {
@@ -911,7 +915,6 @@ export default function WastePage() {
           color: var(--warm-gray); font-size: 0.75rem; padding: 4px;
         }
 
-        /* List */
         .wp-list { display: flex; flex-direction: column; gap: 7px; }
 
         /* Waste row */
@@ -944,25 +947,29 @@ export default function WastePage() {
         .wr-date, .wr-supplier { flex-shrink: 0; }
         .wr-loss { font-weight: 700; font-size: 0.82rem; flex-shrink: 0; }
 
-        /* Quién registró */
         .wr-author {
           display: inline-flex; align-items: center; gap: 5px;
           font-size: 0.74rem; font-weight: 600; color: var(--espresso-soft);
+          padding: 2px 8px; border-radius: 20px;
+          background: rgba(200,137,58,0.08); border: 1px solid rgba(200,137,58,0.2);
+          flex-shrink: 0;
         }
         .wr-author-avatar {
-          width: 20px; height: 20px; border-radius: 50%;
+          width: 18px; height: 18px; border-radius: 50%;
           background: var(--amber); color: white;
           display: flex; align-items: center; justify-content: center;
-          font-size: 0.65rem; font-weight: 700; flex-shrink: 0;
+          font-size: 0.6rem; font-weight: 700; flex-shrink: 0;
         }
-        .wr-author-unknown { color: var(--warm-gray-light); font-style: italic; }
+        .wr-author-unknown {
+          color: var(--warm-gray-light); font-style: italic; font-size: 0.72rem;
+          padding: 2px 8px; border-radius: 20px;
+          background: var(--cream-dark); flex-shrink: 0;
+        }
         .wr-expand-icon { font-size: 0.65rem; color: var(--warm-gray-light); margin-left: auto; }
 
-        /* Detail panel */
         .wr-detail {
           border: 1px solid #C0392B; border-top: none;
-          border-bottom-left-radius: var(--radius-md);
-          border-bottom-right-radius: var(--radius-md);
+          border-bottom-left-radius: var(--radius-md); border-bottom-right-radius: var(--radius-md);
           padding: 12px 18px; background: rgba(192,57,43,0.025);
           animation: fadeIn 0.2s ease;
         }
@@ -974,7 +981,7 @@ export default function WastePage() {
         }
         .wrd-notes { font-size: 0.8rem; color: var(--warm-gray); margin-top: 10px; line-height: 1.5; }
 
-        /* Stats view */
+        /* Stats */
         .wp-stats { display: flex; flex-direction: column; gap: 14px; }
         .wp-stats-card {
           background: white; border: 1px solid var(--cream-dark);
@@ -987,23 +994,16 @@ export default function WastePage() {
           padding-bottom: 10px; border-bottom: 1px solid var(--cream-dark);
         }
 
-        /* Breakdown bars */
         .breakdown-list { display: flex; flex-direction: column; gap: 12px; }
         .breakdown-row  { display: flex; flex-direction: column; gap: 5px; }
         .breakdown-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
         .breakdown-name { font-size: 0.85rem; font-weight: 600; color: var(--espresso); }
         .breakdown-vals { display: flex; align-items: center; gap: 10px; font-size: 0.74rem; color: var(--warm-gray); }
         .breakdown-loss { font-weight: 700; color: #C0392B; }
-        .breakdown-qty  {}
-        .breakdown-count {}
         .breakdown-bar-wrap { display: flex; align-items: center; gap: 8px; }
-        .breakdown-bar-fill {
-          height: 8px; border-radius: 4px; min-width: 4px;
-          transition: width 0.4s ease;
-        }
+        .breakdown-bar-fill { height: 8px; border-radius: 4px; min-width: 4px; transition: width 0.4s ease; }
         .breakdown-pct { font-size: 0.68rem; color: var(--warm-gray); white-space: nowrap; }
 
-        /* User stats */
         .user-stats-list { display: flex; flex-direction: column; gap: 12px; }
         .user-stat-row   { display: flex; align-items: center; gap: 12px; }
         .user-stat-avatar {
@@ -1018,7 +1018,6 @@ export default function WastePage() {
         .user-stat-bar-wrap { width: 80px; flex-shrink: 0; }
         .user-stat-bar   { height: 6px; border-radius: 3px; min-width: 4px; }
 
-        /* Empty states */
         .wp-empty-cta {
           display: flex; flex-direction: column; align-items: center;
           gap: 14px; padding: 48px 24px; text-align: center;
@@ -1046,7 +1045,6 @@ export default function WastePage() {
 
         .wp-count { text-align: right; font-size: 0.75rem; color: var(--warm-gray-light); }
 
-        /* Responsive */
         @media (max-width: 540px) {
           .wp-header    { flex-direction: column; }
           .wp-header-actions { width: 100%; justify-content: flex-end; }

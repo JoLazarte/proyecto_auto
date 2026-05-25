@@ -42,16 +42,20 @@ public class WasteRecordServiceImpl implements WasteRecordService {
 
         validateWasteRequest(batch, request);
 
-        User user = null;
-        if (request.userId() != null) {
-            user = userRepository.findById(request.userId())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Usuario no encontrado con id " + request.userId()));
+        // El userId es OBLIGATORIO para registrar la merma y saber quién la registró.
+        // Si no se recibe, lanzamos BadRequestException con mensaje claro.
+        if (request.userId() == null) {
+            throw new BadRequestException(
+                    "Se requiere el id del usuario que registra la merma.");
         }
 
-        Product product    = batch.getProduct();
-        BigDecimal unitCost       = batch.getUnitCost()       != null ? batch.getUnitCost()       : product.getCostPrice();
-        BigDecimal unitSalePrice  = batch.getUnitSalePrice()  != null ? batch.getUnitSalePrice()  : product.getSalePrice();
+        User user = userRepository.findById(request.userId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Usuario no encontrado con id " + request.userId()));
+
+        Product product       = batch.getProduct();
+        BigDecimal unitCost      = batch.getUnitCost()      != null ? batch.getUnitCost()      : product.getCostPrice();
+        BigDecimal unitSalePrice = batch.getUnitSalePrice() != null ? batch.getUnitSalePrice() : product.getSalePrice();
         if (unitSalePrice == null) unitSalePrice = BigDecimal.ZERO;
 
         BigDecimal economicLoss = request.quantity().multiply(unitSalePrice);
@@ -59,7 +63,7 @@ public class WasteRecordServiceImpl implements WasteRecordService {
         WasteRecord wasteRecord = new WasteRecord();
         wasteRecord.setProduct(product);
         wasteRecord.setBatch(batch);
-        wasteRecord.setCreatedBy(user);
+        wasteRecord.setCreatedBy(user);           // SIEMPRE asignamos el usuario
         wasteRecord.setQuantity(request.quantity());
         wasteRecord.setReason(request.reason());
         wasteRecord.setUnitCost(unitCost);
@@ -84,7 +88,8 @@ public class WasteRecordServiceImpl implements WasteRecordService {
         movement.setMovementType(StockMovementType.WASTE);
         movement.setQuantity(request.quantity());
         movement.setRelatedWasteRecordId(saved.getId());
-        movement.setNotes("Descuento por merma. Motivo: " + request.reason());
+        movement.setNotes("Descuento por merma. Motivo: " + request.reason()
+                + ". Registrado por: " + user.getFirstName() + " " + user.getLastName());
         stockMovementRepository.save(movement);
 
         return WasteRecordMapper.toResponse(saved);
@@ -99,27 +104,23 @@ public class WasteRecordServiceImpl implements WasteRecordService {
             LocalDate to,
             Long categoryId,
             Long supplierId,
-            WasteReason reason
+            WasteReason reason,
+            Long createdById
     ) {
-        // Rango de fechas: si no se proveen, sin límite
-        LocalDateTime fromDt = from != null ? from.atStartOfDay() : null;
+        // Convertir fechas a LocalDateTime para la consulta
+        LocalDateTime fromDt = from != null ? from.atStartOfDay()                         : null;
         LocalDateTime toDt   = to   != null ? to.plusDays(1).atStartOfDay().minusNanos(1) : null;
 
-        // Validación básica de rango
         if (fromDt != null && toDt != null && toDt.isBefore(fromDt)) {
             throw new BadRequestException(
                     "La fecha hasta no puede ser anterior a la fecha desde.");
         }
 
-        List<WasteRecord> records;
+        // Usamos el nuevo método search que empuja los filtros de fecha y usuario a la BD.
+        // Los filtros de categoría, proveedor y motivo se aplican en memoria
+        // (el volumen de datos de un MVP es manejable).
+        List<WasteRecord> records = wasteRecordRepository.search(fromDt, toDt, createdById);
 
-        if (fromDt != null && toDt != null) {
-            records = wasteRecordRepository.findByWasteDateBetween(fromDt, toDt);
-        } else {
-            records = wasteRecordRepository.findAll();
-        }
-
-        // Filtros adicionales en memoria (la tabla no es enorme en un MVP)
         return records.stream()
                 .filter(r -> categoryId == null
                         || (r.getProduct() != null
@@ -127,7 +128,7 @@ public class WasteRecordServiceImpl implements WasteRecordService {
                             && r.getProduct().getCategory().getId().equals(categoryId)))
                 .filter(r -> supplierId == null || matchesSupplier(r, supplierId))
                 .filter(r -> reason == null || reason.equals(r.getReason()))
-                .sorted((a, b) -> b.getWasteDate().compareTo(a.getWasteDate())) // más recientes primero
+                .sorted((a, b) -> b.getWasteDate().compareTo(a.getWasteDate()))
                 .map(WasteRecordMapper::toResponse)
                 .collect(Collectors.toList());
     }
@@ -145,16 +146,10 @@ public class WasteRecordServiceImpl implements WasteRecordService {
 
     // ── HELPERS ───────────────────────────────────────────────────────────────
 
-    /**
-     * Verifica si la merma corresponde a un proveedor específico.
-     * Primero revisa el proveedor del lote; si es null, el del producto.
-     */
     private boolean matchesSupplier(WasteRecord r, Long supplierId) {
-        // Proveedor del lote
         if (r.getBatch() != null && r.getBatch().getSupplier() != null) {
             return supplierId.equals(r.getBatch().getSupplier().getId());
         }
-        // Proveedor por defecto del producto
         if (r.getProduct() != null && r.getProduct().getDefaultSupplier() != null) {
             return supplierId.equals(r.getProduct().getDefaultSupplier().getId());
         }
