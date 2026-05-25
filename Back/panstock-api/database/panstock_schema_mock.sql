@@ -445,8 +445,13 @@ FROM inventory_batches;
 -- ALERTAS iniciales (semáforo para testing)
 -- =========================================================
 INSERT INTO alerts (id, alert_type, product_id, batch_id, message, severity, status, created_at, resolved_at) VALUES
+<<<<<<< HEAD
 (1, 'EXPIRING_SOON', 504, 21,   'Leche vence mañana.', 'RED', 'ACTIVE', NOW(), NULL),
 (2, 'EXPIRING_SOON', 504, 15,   'Leche vence dentro de 7 días.', 'YELLOW', 'ACTIVE', NOW(), NULL);
+=======
+(1, 'EXPIRING_SOON', 504, 21,   'Leche vence mañana.',                                                                      'RED',    'ACTIVE', NOW(), NULL),
+(2, 'EXPIRING_SOON', 504, 15,   'Leche vence dentro de 7 días.',                                                             'YELLOW', 'ACTIVE', NOW(), NULL);
+>>>>>>> 27473fc6bcc849807bd6f18eee52ee26991e1f49
 
 -- =========================================================
 -- VERIFICACIÓN RÁPIDA (descomentar para validar)
