@@ -52,16 +52,14 @@ const expirationPersistConfig = {
   whitelist: ['greenCount', 'yellowCount', 'redCount', 'expiredCount'],
 };
 
-// Waste: persistir solo los filtros activos para mantener el estado al navegar.
-// Los registros siempre se traen frescos del servidor.
+// Waste: persistir solo los filtros activos y la lista de usuarios cargada.
+// Los registros de merma siempre se traen frescos del servidor.
 const wastePersistConfig = {
   key: 'panstock-waste',
   storage,
-  whitelist: ['activeFilters'],
+  // activeFilters incluye el nuevo campo createdById
+  whitelist: ['activeFilters', 'users'],
 };
-
-// Stock: sin persistencia — siempre frescos
-// Waste items: sin persistencia — siempre frescos (solo filtros persisten)
 
 // ─── Root Reducer ─────────────────────────────────────────────────────────────
 
