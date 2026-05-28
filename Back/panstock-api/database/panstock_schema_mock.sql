@@ -241,7 +241,7 @@ CREATE INDEX idx_alerts_batch ON alerts(batch_id);
 -- -------------------------------------------------------
 -- USUARIOS
 -- Contraseña de todos los usuarios: 1234
--- Hash BCrypt de '1234': $2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LXng73I.9iS
+-- Hash BCrypt de '1234': $2a$10$mSv6/GckMyWULmp27zj9XeH6raDO4o/wM2Y8teHyAfPqI0n9Eud.S
 -- Para autenticarse: POST /auth/authenticate { "username": "lorena", "password": "1234" }
 -- -------------------------------------------------------
 INSERT INTO users (id, username, first_name, last_name, email, password, role, enabled, created_at, updated_at) VALUES
@@ -273,25 +273,25 @@ INSERT INTO product_categories (id, name, description, active, created_at, updat
 (9, 'Insumos cafetería',       'Granos de café, azúcar, edulcorante, canela, cacao.',           TRUE,  NOW(), NOW());
 
 -- -------------------------------------------------------
--- PROVEEDORES 
+-- PROVEEDORES
 -- -------------------------------------------------------
 INSERT INTO suppliers (id, name, supplier_type, contact_name, phone, email, notes, active, created_at, updated_at) VALUES
-(1, 'Dulce Hora Franquicia',        'FRANCHISE',  'Distribuidora Dulce Hora', NULL, NULL,
+(1, 'Dulce Hora Franquicia',             'FRANCHISE',  'Distribuidora Dulce Hora', NULL, NULL,
     'Proveedor oficial de productos de franquicia.',                                            TRUE, NOW(), NOW()),
-(2, 'Macro',                        'WHOLESALER', NULL, NULL, NULL,
+(2, 'Macro',                             'WHOLESALER', NULL, NULL, NULL,
     'Leche, té, agua sin gas Cellier, agua con gas Cellier, jugo Citric, agua sin gas Smart, cerveza.',
                                                                                                 TRUE, NOW(), NOW()),
-(3, 'Mayorista de bebidas El Clásico','WHOLESALER',NULL, NULL, NULL,
+(3, 'Mayorista de bebidas El Clásico',   'WHOLESALER', NULL, NULL, NULL,
     'Agua, gaseosa línea Coca Cola, agua saborizada, soda.',                                    TRUE, NOW(), NOW()),
-(4, 'Guajira',                      'EXTERNAL',   NULL, NULL, NULL,
+(4, 'Guajira',                           'EXTERNAL',   NULL, NULL, NULL,
     'Granos de café, azúcar, edulcorante.',                                                     TRUE, NOW(), NOW()),
-(5, 'Estancias del Sur',            'EXTERNAL',   NULL, NULL, NULL,
+(5, 'Estancias del Sur',                 'EXTERNAL',   NULL, NULL, NULL,
     'Jugo Estancias.',                                                                          TRUE, NOW(), NOW()),
 (6, 'Mayorista de chocolate Gustavo Acuña','WHOLESALER',NULL, NULL, NULL,
     'Alfajor sin TACC, cubanito, alfajor 70 negro o blanco.',                                   TRUE, NOW(), NOW()),
-(7, 'Campiña',                      'EXTERNAL',   NULL, NULL, NULL,
+(7, 'Campiña',                           'EXTERNAL',   NULL, NULL, NULL,
     'Canela, cacao y fiambres.',                                                                TRUE, NOW(), NOW()),
-(8, 'D&D Panificados',              'EXTERNAL',   NULL, NULL, NULL,
+(8, 'D&D Panificados',                   'EXTERNAL',   NULL, NULL, NULL,
     'Pan de miga para tostados y sandwiches.',                                                  TRUE, NOW(), NOW());
 
 -- -------------------------------------------------------
@@ -323,7 +323,7 @@ INSERT INTO products (id, name, description, category_id, default_supplier_id, o
 
 -- --- PASTELERÍA (franquicia) ---
 INSERT INTO products (id, name, description, category_id, default_supplier_id, origin, perishable, unit_type, cost_price, sale_price, minimum_stock, active, created_at, updated_at) VALUES
-(7,  'Postre cheesecake frutos rojos','Postre refrigerado de franquicia.',              2, 1, 'FRANCHISE', TRUE,  'UNIT', NULL, NULL,     3.000, TRUE, NOW(), NOW()),
+(7,  'Postre cheesecake frutos rojos', 'Postre refrigerado de franquicia.',             2, 1, 'FRANCHISE', TRUE,  'UNIT', NULL, NULL,     3.000, TRUE, NOW(), NOW()),
 (8,  'Chocotorta',             'Torta/postre de franquicia.',                           2, 1, 'FRANCHISE', TRUE,  'UNIT', NULL, NULL,     3.000, TRUE, NOW(), NOW()),
 (9,  'Lemon pie',              'Tarta dulce de franquicia.',                            2, 1, 'FRANCHISE', TRUE,  'UNIT', NULL, NULL,     3.000, TRUE, NOW(), NOW()),
 (10, 'Mini rogel',             'Mini torta/postre de franquicia.',                      2, 1, 'FRANCHISE', TRUE,  'UNIT', NULL, NULL,     4.000, TRUE, NOW(), NOW());
@@ -338,56 +338,56 @@ INSERT INTO products (id, name, description, category_id, default_supplier_id, o
 
 -- --- BEBIDAS (externas) ---
 INSERT INTO products (id, name, description, category_id, default_supplier_id, origin, perishable, unit_type, cost_price, sale_price, minimum_stock, active, created_at, updated_at) VALUES
-(101,'Agua sin gas Cellier 600ml',   'Agua sin gas. Proveedor: Macro.',                4, 2, 'EXTERNAL',  TRUE,  'UNIT', NULL, 1500.00, 12.000, TRUE, NOW(), NOW()),
-(102,'Agua con gas Cellier 600ml',   'Agua con gas. Proveedor: Macro.',                4, 2, 'EXTERNAL',  TRUE,  'UNIT', NULL, 1500.00, 12.000, TRUE, NOW(), NOW()),
-(103,'Agua sin gas Smart 500ml',     'Agua sin gas. Proveedor: Macro.',                4, 2, 'EXTERNAL',  TRUE,  'UNIT', NULL, 2000.00, 12.000, TRUE, NOW(), NOW()),
-(104,'Gaseosa línea Coca Cola',      'Gaseosa 500ml. Proveedor: El Clásico.',          4, 3, 'EXTERNAL',  TRUE,  'UNIT', NULL, 2500.00, 12.000, TRUE, NOW(), NOW()),
-(105,'Agua saborizada Levite/Aquarius','500ml. Proveedor: El Clásico.',                4, 3, 'EXTERNAL',  TRUE,  'UNIT', NULL, 2200.00, 12.000, TRUE, NOW(), NOW()),
-(106,'Jugo Estancias',               'Jugo Estancias. Proveedor: Estancias del Sur.',  4, 5, 'EXTERNAL',  TRUE,  'UNIT', NULL, 3500.00, 10.000, TRUE, NOW(), NOW()),
-(107,'Jugo Citric',                  'Jugo Citric. Proveedor: Macro.',                 4, 2, 'EXTERNAL',  TRUE,  'UNIT', NULL, 3500.00, 10.000, TRUE, NOW(), NOW()),
-(108,'Cerveza',                      'Cerveza en lata/botella. Proveedor: Macro.',     4, 2, 'EXTERNAL',  TRUE,  'UNIT', NULL, 4000.00,  8.000, TRUE, NOW(), NOW());
+(101, 'Agua sin gas Cellier 600ml',    'Agua sin gas. Proveedor: Macro.',               4, 2, 'EXTERNAL',  TRUE,  'UNIT', NULL, 1500.00, 12.000, TRUE, NOW(), NOW()),
+(102, 'Agua con gas Cellier 600ml',    'Agua con gas. Proveedor: Macro.',               4, 2, 'EXTERNAL',  TRUE,  'UNIT', NULL, 1500.00, 12.000, TRUE, NOW(), NOW()),
+(103, 'Agua sin gas Smart 500ml',      'Agua sin gas. Proveedor: Macro.',               4, 2, 'EXTERNAL',  TRUE,  'UNIT', NULL, 2000.00, 12.000, TRUE, NOW(), NOW()),
+(104, 'Gaseosa línea Coca Cola',       'Gaseosa 500ml. Proveedor: El Clásico.',         4, 3, 'EXTERNAL',  TRUE,  'UNIT', NULL, 2500.00, 12.000, TRUE, NOW(), NOW()),
+(105, 'Agua saborizada Levite/Aquarius','500ml. Proveedor: El Clásico.',                4, 3, 'EXTERNAL',  TRUE,  'UNIT', NULL, 2200.00, 12.000, TRUE, NOW(), NOW()),
+(106, 'Jugo Estancias',                'Jugo Estancias. Proveedor: Estancias del Sur.', 4, 5, 'EXTERNAL',  TRUE,  'UNIT', NULL, 3500.00, 10.000, TRUE, NOW(), NOW()),
+(107, 'Jugo Citric',                   'Jugo Citric. Proveedor: Macro.',                4, 2, 'EXTERNAL',  TRUE,  'UNIT', NULL, 3500.00, 10.000, TRUE, NOW(), NOW()),
+(108, 'Cerveza',                       'Cerveza en lata/botella. Proveedor: Macro.',    4, 2, 'EXTERNAL',  TRUE,  'UNIT', NULL, 4000.00,  8.000, TRUE, NOW(), NOW());
 
 -- --- CAFÉ E INFUSIONES (externos - precios de venta para referencia) ---
 -- ACLARACIÓN: estos productos se preparan en el momento.
 -- El stock real se controla por los insumos (categoría 9).
 -- Se cargan aquí solo para poder registrar ventas manuales si se desea.
 INSERT INTO products (id, name, description, category_id, default_supplier_id, origin, perishable, unit_type, cost_price, sale_price, minimum_stock, active, created_at, updated_at) VALUES
-(201,'Café jarrito',           'Café solo, lágrima o cortado. Preparado en el momento.',5, 4, 'EXTERNAL',  FALSE, 'UNIT', NULL, 3300.00, NULL, TRUE, NOW(), NOW()),
-(202,'Café con leche para llevar','Preparado en el momento.',                           5, 4, 'EXTERNAL',  FALSE, 'UNIT', NULL, 3000.00, NULL, TRUE, NOW(), NOW()),
-(203,'Café con leche salón',   'Preparado en el momento.',                              5, 4, 'EXTERNAL',  FALSE, 'UNIT', NULL, 3600.00, NULL, TRUE, NOW(), NOW()),
-(204,'Café en pocillo',        'Café solo, lágrima o cortado. Preparado en el momento.',5, 4, 'EXTERNAL',  FALSE, 'UNIT', NULL, 2500.00, NULL, TRUE, NOW(), NOW()),
-(205,'Té',                     'Preparado en el momento.',                              5, 2, 'EXTERNAL',  FALSE, 'UNIT', NULL, 2200.00, NULL, TRUE, NOW(), NOW()),
-(206,'Té con leche',           'Preparado en el momento.',                              5, 2, 'EXTERNAL',  FALSE, 'UNIT', NULL, 2800.00, NULL, TRUE, NOW(), NOW()),
-(207,'Submarino',              'Preparado en el momento.',                              5, 2, 'EXTERNAL',  FALSE, 'UNIT', NULL, 5500.00, NULL, TRUE, NOW(), NOW()),
-(208,'Taza de leche',          'Sola, fría o caliente. Preparada en el momento.',       5, 2, 'EXTERNAL',  FALSE, 'UNIT', NULL, 2500.00, NULL, TRUE, NOW(), NOW()),
-(209,'Cindor/Nesquik cajita',  'Cajita lista para servir.',                             5, 2, 'EXTERNAL',  TRUE,  'UNIT', NULL, 3000.00, 6.000, TRUE, NOW(), NOW()),
-(210,'Capuccino',              'Con canela y chocolate. Preparado en el momento.',      5, 4, 'EXTERNAL',  FALSE, 'UNIT', NULL, 6500.00, NULL, TRUE, NOW(), NOW()),
-(211,'Capuccino con crema',    'Crema, canela y cacao amargo. Preparado en el momento.',5, 4, 'EXTERNAL',  FALSE, 'UNIT', NULL, 8500.00, NULL, TRUE, NOW(), NOW()),
-(212,'Capuccino para llevar',  'Canela y cacao. Preparado en el momento.',              5, 4, 'EXTERNAL',  FALSE, 'UNIT', NULL, 5000.00, NULL, TRUE, NOW(), NOW());
+(201, 'Café jarrito',           'Café solo, lágrima o cortado. Preparado en el momento.',5, 4, 'EXTERNAL',  FALSE, 'UNIT', NULL, 3300.00, NULL, TRUE, NOW(), NOW()),
+(202, 'Café con leche para llevar', 'Preparado en el momento.',                          5, 4, 'EXTERNAL',  FALSE, 'UNIT', NULL, 3000.00, NULL, TRUE, NOW(), NOW()),
+(203, 'Café con leche salón',   'Preparado en el momento.',                              5, 4, 'EXTERNAL',  FALSE, 'UNIT', NULL, 3600.00, NULL, TRUE, NOW(), NOW()),
+(204, 'Café en pocillo',        'Café solo, lágrima o cortado. Preparado en el momento.',5, 4, 'EXTERNAL',  FALSE, 'UNIT', NULL, 2500.00, NULL, TRUE, NOW(), NOW()),
+(205, 'Té',                     'Preparado en el momento.',                              5, 2, 'EXTERNAL',  FALSE, 'UNIT', NULL, 2200.00, NULL, TRUE, NOW(), NOW()),
+(206, 'Té con leche',           'Preparado en el momento.',                              5, 2, 'EXTERNAL',  FALSE, 'UNIT', NULL, 2800.00, NULL, TRUE, NOW(), NOW()),
+(207, 'Submarino',              'Preparado en el momento.',                              5, 2, 'EXTERNAL',  FALSE, 'UNIT', NULL, 5500.00, NULL, TRUE, NOW(), NOW()),
+(208, 'Taza de leche',          'Sola, fría o caliente. Preparada en el momento.',       5, 2, 'EXTERNAL',  FALSE, 'UNIT', NULL, 2500.00, NULL, TRUE, NOW(), NOW()),
+(209, 'Cindor/Nesquik cajita',  'Cajita lista para servir.',                             5, 2, 'EXTERNAL',  TRUE,  'UNIT', NULL, 3000.00, 6.000, TRUE, NOW(), NOW()),
+(210, 'Capuccino',              'Con canela y chocolate. Preparado en el momento.',      5, 4, 'EXTERNAL',  FALSE, 'UNIT', NULL, 6500.00, NULL, TRUE, NOW(), NOW()),
+(211, 'Capuccino con crema',    'Crema, canela y cacao amargo. Preparado en el momento.',5, 4, 'EXTERNAL',  FALSE, 'UNIT', NULL, 8500.00, NULL, TRUE, NOW(), NOW()),
+(212, 'Capuccino para llevar',  'Canela y cacao. Preparado en el momento.',              5, 4, 'EXTERNAL',  FALSE, 'UNIT', NULL, 5000.00, NULL, TRUE, NOW(), NOW());
 
 -- --- SIN TACC (externos) ---
 INSERT INTO products (id, name, description, category_id, default_supplier_id, origin, perishable, unit_type, cost_price, sale_price, minimum_stock, active, created_at, updated_at) VALUES
-(301,'Alfajor sin TACC',       'Apto celíacos. Proveedor: Gustavo Acuña.',             6, 6, 'EXTERNAL',  TRUE,  'UNIT', NULL, 2800.00, 10.000, TRUE, NOW(), NOW());
+(301, 'Alfajor sin TACC',      'Apto celíacos. Proveedor: Gustavo Acuña.',              6, 6, 'EXTERNAL',  TRUE,  'UNIT', NULL, 2800.00, 10.000, TRUE, NOW(), NOW());
 
 -- --- CHOCOLATES Y GOLOSINAS (externos) ---
 INSERT INTO products (id, name, description, category_id, default_supplier_id, origin, perishable, unit_type, cost_price, sale_price, minimum_stock, active, created_at, updated_at) VALUES
-(401,'Alfajor 70 negro o blanco','Alfajor de chocolate. Proveedor: Gustavo Acuña.',    7, 6, 'EXTERNAL',  TRUE,  'UNIT', NULL, 1800.00, 10.000, TRUE, NOW(), NOW()),
-(402,'Cubanito',               'Proveedor: Gustavo Acuña.',                            7, 6, 'EXTERNAL',  TRUE,  'UNIT', NULL, 1500.00, 10.000, TRUE, NOW(), NOW());
+(401, 'Alfajor 70 negro o blanco', 'Alfajor de chocolate. Proveedor: Gustavo Acuña.',   7, 6, 'EXTERNAL',  TRUE,  'UNIT', NULL, 1800.00, 10.000, TRUE, NOW(), NOW()),
+(402, 'Cubanito',               'Proveedor: Gustavo Acuña.',                            7, 6, 'EXTERNAL',  TRUE,  'UNIT', NULL, 1500.00, 10.000, TRUE, NOW(), NOW());
 
 -- --- INSUMOS CAFETERÍA (lo que realmente se stockea para preparar bebidas) ---
 INSERT INTO products (id, name, description, category_id, default_supplier_id, origin, perishable, unit_type, cost_price, sale_price, minimum_stock, active, created_at, updated_at) VALUES
-(501,'Granos de café',         'Para preparación de café. Proveedor: Guajira.',        9, 4, 'EXTERNAL',  TRUE,  'KG',   NULL, 0.00,    2.000, TRUE, NOW(), NOW()),
-(502,'Azúcar',                 'Para mesas y preparaciones. Proveedor: Guajira.',      9, 4, 'EXTERNAL',  FALSE, 'KG',   NULL, 0.00,    3.000, TRUE, NOW(), NOW()),
-(503,'Edulcorante',            'Para mesas. Proveedor: Guajira.',                      9, 4, 'EXTERNAL',  FALSE, 'PACK', NULL, 0.00,    2.000, TRUE, NOW(), NOW()),
-(504,'Leche',                  'Para café con leche, submarino, etc. Proveedor: Macro.',9,2, 'EXTERNAL',  TRUE,  'LITER',NULL, 0.00,    5.000, TRUE, NOW(), NOW()),
-(505,'Té en saquitos',         'Proveedor: Macro.',                                    9, 2, 'EXTERNAL',  FALSE, 'PACK', NULL, 0.00,    2.000, TRUE, NOW(), NOW()),
-(506,'Canela',                 'Para capuccino. Proveedor: Campiña.',                  9, 7, 'EXTERNAL',  FALSE, 'PACK', NULL, 0.00,    1.000, TRUE, NOW(), NOW()),
-(507,'Cacao en polvo',         'Para capuccino. Proveedor: Campiña.',                  9, 7, 'EXTERNAL',  FALSE, 'PACK', NULL, 0.00,    1.000, TRUE, NOW(), NOW());
+(501, 'Granos de café',        'Para preparación de café. Proveedor: Guajira.',         9, 4, 'EXTERNAL',  TRUE,  'KG',    NULL, 0.00, 2.000, TRUE, NOW(), NOW()),
+(502, 'Azúcar',                'Para mesas y preparaciones. Proveedor: Guajira.',       9, 4, 'EXTERNAL',  FALSE, 'KG',    NULL, 0.00, 3.000, TRUE, NOW(), NOW()),
+(503, 'Edulcorante',           'Para mesas. Proveedor: Guajira.',                       9, 4, 'EXTERNAL',  FALSE, 'PACK',  NULL, 0.00, 2.000, TRUE, NOW(), NOW()),
+(504, 'Leche',                 'Para café con leche, submarino, etc. Proveedor: Macro.',9, 2, 'EXTERNAL',  TRUE,  'LITER', NULL, 0.00, 5.000, TRUE, NOW(), NOW()),
+(505, 'Té en saquitos',        'Proveedor: Macro.',                                     9, 2, 'EXTERNAL',  FALSE, 'PACK',  NULL, 0.00, 2.000, TRUE, NOW(), NOW()),
+(506, 'Canela',                'Para capuccino. Proveedor: Campiña.',                   9, 7, 'EXTERNAL',  FALSE, 'PACK',  NULL, 0.00, 1.000, TRUE, NOW(), NOW()),
+(507, 'Cacao en polvo',        'Para capuccino. Proveedor: Campiña.',                   9, 7, 'EXTERNAL',  FALSE, 'PACK',  NULL, 0.00, 1.000, TRUE, NOW(), NOW());
 
 -- --- INSUMOS DESCARTABLES ---
 INSERT INTO products (id, name, description, category_id, default_supplier_id, origin, perishable, unit_type, cost_price, sale_price, minimum_stock, active, created_at, updated_at) VALUES
-(601,'Vasos descartables',     'Vasos para café para llevar.',                         8, NULL, 'EXTERNAL', FALSE, 'PACK', NULL, 0.00,   5.000, TRUE, NOW(), NOW()),
-(602,'Servilletas',            'Servilletas para mesas.',                              8, NULL, 'EXTERNAL', FALSE, 'PACK', NULL, 0.00,   5.000, TRUE, NOW(), NOW());
+(601, 'Vasos descartables',    'Vasos para café para llevar.',                          8, NULL, 'EXTERNAL', FALSE, 'PACK', NULL, 0.00, 5.000, TRUE, NOW(), NOW()),
+(602, 'Servilletas',           'Servilletas para mesas.',                               8, NULL, 'EXTERNAL', FALSE, 'PACK', NULL, 0.00, 5.000, TRUE, NOW(), NOW());
 
 -- -------------------------------------------------------
 -- CONFIGURACIONES
@@ -398,10 +398,12 @@ INSERT INTO app_settings (id, setting_key, setting_value, description) VALUES
 
 -- =========================================================
 -- LOTES DE INVENTARIO (mock para testing)
--- Solo se cargan lotes para los productos que tienen stock
--- físico real: bebidas, sin TACC, chocolates e insumos.
--- Los productos de franquicia y cafetería preparada
--- se pueden cargar desde el frontend con POST /api/stock/entries.
+--
+-- Lotes id 1-21: stock operativo normal (bebidas, sin TACC, chocolates, insumos).
+-- Lotes id 22-24: lotes de prueba del semáforo, uno por cada estado urgente:
+--   id=22 → ExpirationStatus.RED    (vence HOY,  days=0)
+--   id=23 → ExpirationStatus.YELLOW (vence mañana, days=1, dentro de alertDays=2)
+--   id=24 → ExpirationStatus.EXPIRED (venció ayer, days=-1)
 -- =========================================================
 
 INSERT INTO inventory_batches (id, product_id, supplier_id, received_date, expiration_date, initial_quantity, current_quantity, unit_cost, unit_sale_price, storage_type, batch_status, notes, created_at, updated_at) VALUES
@@ -430,8 +432,21 @@ INSERT INTO inventory_batches (id, product_id, supplier_id, received_date, expir
 -- Insumos descartables
 (19, 601, NULL, DATE_SUB(CURDATE(), INTERVAL 30 DAY), NULL,                               10.000, 10.000, NULL,    0.00, 'STORAGE',  'AVAILABLE', 'Vasos descartables.',          NOW(), NOW()),
 (20, 602, NULL, DATE_SUB(CURDATE(), INTERVAL 30 DAY), NULL,                               10.000, 10.000, NULL,    0.00, 'STORAGE',  'AVAILABLE', 'Servilletas.',                 NOW(), NOW()),
--- Lote próximo a vencer para probar semáforo (leche)
-(21, 504, 2, DATE_SUB(CURDATE(), INTERVAL 8 DAY),  DATE_ADD(CURDATE(), INTERVAL 1 DAY),    5.000,  3.000, NULL,    0.00, 'FRIDGE',   'AVAILABLE', 'Leche próxima a vencer.',      NOW(), NOW());
+-- Lote de leche próximo a vencer — queda DEPLETED tras las mermas mock (ver más abajo)
+(21, 504, 2, DATE_SUB(CURDATE(), INTERVAL 8 DAY),  DATE_ADD(CURDATE(), INTERVAL 1 DAY),    5.000,  3.000, NULL,    0.00, 'FRIDGE',   'AVAILABLE', 'Leche próxima a vencer.',      NOW(), NOW()),
+-- -------------------------------------------------------
+-- LOTES DE PRUEBA DEL SEMÁFORO
+--
+-- id=22 → ExpirationStatus.RED    days=0  (vence HOY)
+--   severity=RED  en la alerta; alertType=EXPIRING_SOON
+-- id=23 → ExpirationStatus.YELLOW days=1  (vence mañana, <= alertDays=2)
+--   severity=YELLOW en la alerta; alertType=EXPIRING_SOON
+-- id=24 → ExpirationStatus.EXPIRED days=-1 (venció ayer)
+--   severity=RED  en la alerta; alertType=EXPIRED
+-- -------------------------------------------------------
+(22, 301, 6, DATE_SUB(CURDATE(), INTERVAL 10 DAY), CURDATE(),                              6.000,  6.000, NULL, 2800.00, 'DISPLAY',  'AVAILABLE', 'Prueba semáforo RED — vence hoy.',       NOW(), NOW()),
+(23, 402, 6, DATE_SUB(CURDATE(), INTERVAL 5 DAY),  DATE_ADD(CURDATE(), INTERVAL 1 DAY),    6.000,  6.000, NULL, 1500.00, 'DISPLAY',  'AVAILABLE', 'Prueba semáforo YELLOW — vence mañana.', NOW(), NOW()),
+(24, 106, 5, DATE_SUB(CURDATE(), INTERVAL 30 DAY), DATE_SUB(CURDATE(), INTERVAL 1 DAY),   12.000,  5.000, NULL, 3500.00, 'FRIDGE',   'AVAILABLE', 'Prueba semáforo EXPIRED — venció ayer.', NOW(), NOW());
 
 -- =========================================================
 -- MOVIMIENTOS ENTRY iniciales para todos los lotes
@@ -443,10 +458,27 @@ FROM inventory_batches;
 
 -- =========================================================
 -- ALERTAS iniciales (semáforo para testing)
+--
+-- Regla de severidad (AlertServiceImpl.generateExpirationAlerts):
+--   days == 0       → severity RED   (alertType EXPIRING_SOON)
+--   days >= 1 && <= alertDays → severity YELLOW (alertType EXPIRING_SOON)
+--   days <  0       → severity RED   (alertType EXPIRED)
 -- =========================================================
-INSERT INTO alerts (id, alert_type, product_id, batch_id, message, severity, status, created_at, resolved_at) VALUES
-(1, 'EXPIRING_SOON', 504, 21,   'Leche vence mañana.', 'RED', 'ACTIVE', NOW(), NULL),
-(2, 'EXPIRING_SOON', 504, 15,   'Leche vence dentro de 7 días.', 'YELLOW', 'ACTIVE', NOW(), NULL);
+INSERT INTO alerts (alert_type, product_id, batch_id, message, severity, status, created_at, resolved_at) VALUES
+-- Lote 22: vence HOY → RED
+('EXPIRING_SOON', 301, 22,
+ 'Alfajor sin TACC vence hoy.',
+ 'RED', 'ACTIVE', NOW(), NULL),
+
+-- Lote 23: vence mañana (days=1, dentro de alertDays=2) → YELLOW
+('EXPIRING_SOON', 402, 23,
+ 'Cubanito vence dentro de 1 día.',
+ 'YELLOW', 'ACTIVE', NOW(), NULL),
+
+-- Lote 24: ya venció (days=-1) → RED, tipo EXPIRED
+('EXPIRED', 106, 24,
+ 'Jugo Estancias ya venció.',
+ 'RED', 'ACTIVE', NOW(), NULL);
 
 -- =========================================================
 -- VERIFICACIÓN RÁPIDA (descomentar para validar)
@@ -458,10 +490,24 @@ INSERT INTO alerts (id, alert_type, product_id, batch_id, message, severity, sta
 -- GROUP BY p.id, p.name ORDER BY p.id;
 
 -- SELECT b.id, p.name, b.current_quantity, b.batch_status, b.expiration_date,
---        DATEDIFF(b.expiration_date, CURDATE()) AS dias_para_vencer
+--        DATEDIFF(b.expiration_date, CURDATE()) AS dias_para_vencer,
+--        CASE
+--          WHEN b.expiration_date IS NULL                    THEN 'NOT_APPLICABLE'
+--          WHEN DATEDIFF(b.expiration_date, CURDATE()) < 0  THEN 'EXPIRED'
+--          WHEN DATEDIFF(b.expiration_date, CURDATE()) = 0  THEN 'RED'
+--          WHEN DATEDIFF(b.expiration_date, CURDATE()) <= 2 THEN 'YELLOW'
+--          ELSE                                                   'GREEN'
+--        END AS expiration_status_esperado
 -- FROM inventory_batches b
 -- JOIN products p ON p.id = b.product_id
--- ORDER BY b.expiration_date IS NULL, b.expiration_date ASC;
+-- ORDER BY b.expiration_date IS NULL, DATEDIFF(b.expiration_date, CURDATE()) ASC;
+
+-- SELECT a.id, a.alert_type, p.name AS producto, a.severity, a.status,
+--        b.expiration_date, DATEDIFF(b.expiration_date, CURDATE()) AS dias
+-- FROM alerts a
+-- JOIN products p  ON p.id  = a.product_id
+-- LEFT JOIN inventory_batches b ON b.id = a.batch_id
+-- ORDER BY a.created_at DESC;
 
 -- SELECT status, COUNT(*) FROM alerts GROUP BY status;
 
@@ -483,7 +529,6 @@ INSERT INTO alerts (id, alert_type, product_id, batch_id, message, severity, sta
 --   11  → cubanito (product_id=402, unit_sale_price=1500)
 --   12  → cindor (product_id=209, unit_sale_price=3000)
 --   13  → granos de café (product_id=501)
--- -------------------------------------------------------
 
 INSERT INTO waste_records
     (product_id, batch_id, created_by_id, quantity, reason,
@@ -494,50 +539,50 @@ VALUES
  DATE_SUB(NOW(), INTERVAL 5 DAY),
  NULL, 2800.00, 5600.00,
  'Dos alfajores sin TACC encontrados vencidos en mostrador.', NOW()),
- 
+
 -- Gabriel descarta 3 alfajores 70 dañados
 (401, 10, 2, 3.000, 'DAMAGED',
  DATE_SUB(NOW(), INTERVAL 4 DAY),
  NULL, 1800.00, 5400.00,
  'Packaging roto, producto no apto para venta.', NOW()),
- 
+
 -- Martina descarta 1 cindor por calidad
 (209, 12, 3, 1.000, 'QUALITY_ISSUE',
  DATE_SUB(NOW(), INTERVAL 3 DAY),
  NULL, 3000.00, 3000.00,
  'Caja abollada, producto en mal estado.', NOW()),
- 
+
 -- Lorena: consumo interno de 2 cubanitos
 (402, 11, 1, 2.000, 'INTERNAL_CONSUMPTION',
  DATE_SUB(NOW(), INTERVAL 2 DAY),
  NULL, 1500.00, 3000.00,
  'Consumo interno del turno mañana.', NOW()),
- 
--- Martina: descarta 5 litros de leche vencida
+
+-- Martina: descarta 5 litros de leche vencida (agota el lote 21 → DEPLETED)
 (504, 21, 3, 5.000, 'EXPIRED',
  DATE_SUB(NOW(), INTERVAL 1 DAY),
  NULL, 0.00, 0.00,
  'Leche del lote 21 vencida. Se descarta por completo.', NOW()),
- 
+
 -- Gabriel: 1 alfajor sin TACC por otro motivo
 (301, 9, 2, 1.000, 'OTHER',
  NOW(),
  NULL, 2800.00, 2800.00,
  'Producto caído al suelo, no se puede vender.', NOW());
- 
+
 -- Actualizar current_quantity de los lotes afectados para reflejar las mermas
 -- Lote 9  (alfajor sin TACC): 20 - 2 - 1 = 17
 -- Lote 10 (alfajor 70):       20 - 3     = 17
 -- Lote 11 (cubanito):         20 - 2     = 18
 -- Lote 12 (cindor):           10 - 1     =  9
 -- Lote 21 (leche prox):        3 - 3     =  0  → DEPLETED
- 
+
 UPDATE inventory_batches SET current_quantity = 17.000 WHERE id = 9;
 UPDATE inventory_batches SET current_quantity = 17.000 WHERE id = 10;
 UPDATE inventory_batches SET current_quantity = 18.000 WHERE id = 11;
 UPDATE inventory_batches SET current_quantity =  9.000 WHERE id = 12;
 UPDATE inventory_batches SET current_quantity =  0.000, batch_status = 'DEPLETED' WHERE id = 21;
- 
+
 -- Registrar los movimientos WASTE correspondientes en stock_movements
 INSERT INTO stock_movements
     (product_id, batch_id, user_id, movement_type, quantity,
@@ -554,8 +599,9 @@ SELECT
     w.created_at
 FROM waste_records w
 WHERE w.created_at >= DATE_SUB(NOW(), INTERVAL 6 DAY);
+
 -- =========================================================
--- VERIFICACIÓN (descomentar para validar)
+-- VERIFICACIÓN DE MERMAS (descomentar para validar)
 -- =========================================================
 
 -- SELECT wr.id, p.name AS producto, wr.quantity, wr.reason,
@@ -564,4 +610,3 @@ WHERE w.created_at >= DATE_SUB(NOW(), INTERVAL 6 DAY);
 -- JOIN products p ON p.id = wr.product_id
 -- LEFT JOIN users u ON u.id = wr.created_by_id
 -- ORDER BY wr.waste_date DESC;
-
