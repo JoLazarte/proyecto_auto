@@ -1,26 +1,28 @@
 /**
- * NotificationSettingsModal.jsx — FIXED v3
+ * NotificationSettingsModal.jsx — v4 FIXED
  *
- * Fixes vs v2:
- *  1. El modal SIEMPRE hace scroll al inicio al abrir (scrollTop=0)
- *  2. La sección "Permiso del navegador" es la PRIMERA visible
- *  3. El toggle principal está SIEMPRE visible (no oculto por scroll)
- *  4. Notificación de prueba mejorada: usa Notification API directa
- *     como primera opción (más confiable en escritorio), SW como segunda
- *  5. Botón "Permitir notificaciones" con feedback visual claro
- *  6. Se muestra el estado real del permiso del NAVEGADOR (no del store)
- *     para que el usuario vea el estado actualizado
+ * Correcciones vs v3:
+ *  1. El estado del permiso se lee siempre del NAVEGADOR REAL (no del store).
+ *     Esto evita que el modal muestre "Sin configurar" cuando el browser ya
+ *     tiene 'granted' pero el store está en 'default' por el bug de persist.
+ *  2. Al abrir el modal se sincroniza el store con el permiso real del browser.
+ *  3. El botón "Conceder permiso" también aparece cuando el permiso está en
+ *     'denied' con instrucciones claras de cómo re-habilitarlo.
+ *  4. Se agregó opción para revocar/deshabilitar notificaciones desde la UI.
+ *  5. El scroll al inicio al abrir el modal está garantizado.
  */
 import { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import { useDispatch, useSelector } from 'react-redux';
+import { createPortal }                from 'react-dom';
+import { useDispatch, useSelector }    from 'react-redux';
 import {
   selectNotifEnabled, selectNotifChannel, selectNotifInterval,
-  selectNotifDaysAhead, selectNotifPermission, selectLastCheckAt,
+  selectNotifDaysAhead, selectLastCheckAt,
   setEnabled, setChannel, setIntervalMinutes, setAlertDaysAhead,
+  syncPermission,
 } from '../../features/notifications/notificationsSlice';
 import {
   isMobileDevice, supportsNotifications, supportsServiceWorker,
+  getBrowserPermission,
 } from '../../features/notifications/useNotifications';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -33,18 +35,12 @@ function fmt(ts) {
   return new Date(ts).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
 }
 
-// Lee el permiso REAL del navegador (no el cacheado en Redux)
-function getBrowserPermission() {
-  if (!supportsNotifications()) return 'unsupported';
-  return Notification.permission; // 'default' | 'granted' | 'denied'
-}
-
 function PermBadge({ p }) {
   const map = {
-    granted:     { icon: '✅', label: 'Concedido',     color: '#2E7D32', bg: 'rgba(46,125,50,0.10)'     },
-    denied:      { icon: '🚫', label: 'Denegado',      color: '#C0392B', bg: 'rgba(192,57,43,0.10)'     },
-    default:     { icon: '⚠️', label: 'Sin configurar',color: '#D68910', bg: 'rgba(214,137,16,0.10)'    },
-    unsupported: { icon: '❌', label: 'No soportado',  color: '#8C7B6B', bg: 'rgba(140,123,107,0.10)'   },
+    granted:     { icon: '✅', label: 'Concedido',      color: '#2E7D32', bg: 'rgba(46,125,50,0.10)'     },
+    denied:      { icon: '🚫', label: 'Denegado',       color: '#C0392B', bg: 'rgba(192,57,43,0.10)'     },
+    default:     { icon: '⚠️', label: 'Sin configurar', color: '#D68910', bg: 'rgba(214,137,16,0.10)'    },
+    unsupported: { icon: '❌', label: 'No soportado',   color: '#8C7B6B', bg: 'rgba(140,123,107,0.10)'   },
   };
   const c = map[p] || map.default;
   return (
@@ -130,8 +126,10 @@ export default function NotificationSettingsModal({ onClose, onRequestPermission
   const daysAhead = useSelector(selectNotifDaysAhead);
   const lastCheck = useSelector(selectLastCheckAt);
 
-  // Leer permiso REAL del navegador en cada render
-  const [browserPerm, setBrowserPerm] = useState(getBrowserPermission());
+  // ── Estado del permiso: SIEMPRE desde el navegador real ────────────────
+  // Esto corrige el bug donde el store tenía 'default' pero el browser 'granted'
+  const [browserPerm, setBrowserPerm] = useState(() => getBrowserPermission());
+
   const bodyRef  = useRef(null);
   const isMobile = isMobileDevice();
   const hasNotif = supportsNotifications();
@@ -139,14 +137,20 @@ export default function NotificationSettingsModal({ onClose, onRequestPermission
 
   const canToggle = hasNotif && browserPerm === 'granted';
 
-  const [req,   setReq]   = useState(false);
-  const [sent,  setSent]  = useState(false);
+  const [req,     setReq]     = useState(false);
+  const [sent,    setSent]    = useState(false);
   const [testErr, setTestErr] = useState('');
-  const [lDays, setLDays] = useState(String(daysAhead));
-  const [lIvl,  setLIvl]  = useState(String(interval));
+  const [lDays,   setLDays]   = useState(String(daysAhead));
+  const [lIvl,    setLIvl]    = useState(String(interval));
 
-  // Efectivo canal
   const effCh = channel === 'auto' ? (isMobile ? 'push' : 'desktop') : channel;
+
+  // ── Al abrir: leer permiso real + sincronizar store ───────────────────
+  useEffect(() => {
+    const real = getBrowserPermission();
+    setBrowserPerm(real);
+    dispatch(syncPermission());
+  }, [dispatch]);
 
   // Bloquear scroll del body
   useEffect(() => {
@@ -155,7 +159,7 @@ export default function NotificationSettingsModal({ onClose, onRequestPermission
     return () => { document.body.style.overflow = prev; };
   }, []);
 
-  // Scroll al inicio al abrir
+  // Scroll al inicio
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = 0;
   }, []);
@@ -167,7 +171,7 @@ export default function NotificationSettingsModal({ onClose, onRequestPermission
     return () => document.removeEventListener('keydown', h);
   }, [onClose]);
 
-  // Helpers para los steppers
+  // ── Helpers steppers ─────────────────────────────────────────────────
   const applyDays = v => {
     const n = Math.max(1, Math.min(7, parseInt(v) || 2));
     setLDays(String(n));
@@ -188,41 +192,51 @@ export default function NotificationSettingsModal({ onClose, onRequestPermission
     return `Cada ${h}h${m > 0 ? ` ${m}min` : ''}`;
   })();
 
-  // Solicitar permiso
+  // ── Solicitar permiso ─────────────────────────────────────────────────
   const handleReq = async () => {
     setReq(true);
     try {
       await onRequestPermission?.();
-      // Actualizar estado local con el permiso real post-solicitud
-      setBrowserPerm(getBrowserPermission());
+      // Leer el resultado real del browser (no del store)
+      const real = getBrowserPermission();
+      setBrowserPerm(real);
+      dispatch(syncPermission());
     } finally {
       setReq(false);
     }
   };
 
-  // Notificación de prueba
-  // Estrategia: Notification API directa primero (más confiable en escritorio),
-  // luego SW como alternativa para móvil.
+  // ── Deshabilitar notificaciones (sin revocar el permiso del browser) ──
+  const handleDisable = () => {
+    dispatch(setEnabled(false));
+  };
+
+  // ── Notificación de prueba ────────────────────────────────────────────
   const handleTest = async () => {
     setTestErr('');
     if (!hasNotif) { setTestErr('Tu navegador no soporta notificaciones.'); return; }
-    if (Notification.permission !== 'granted') {
-      setTestErr('Primero necesitás conceder permiso al navegador (botón de arriba).');
+
+    // Leer permiso REAL del browser para la prueba
+    const realPerm = getBrowserPermission();
+    if (realPerm !== 'granted') {
+      setTestErr('Primero concedé permiso al navegador (botón de arriba).');
       return;
     }
 
     const title = '🧪 PanStock — Prueba de notificación';
-    const body  = '📅 Vence: 31 de mayo de 2026\n📦 Stock en riesgo: 6 u.\nEsta es una notificación de prueba.';
+    const body  = [
+      '📂 Panadería',
+      '📅 Vence: 31 de mayo de 2026',
+      '📦 Cantidad en riesgo: 6 u.',
+      '(Notificación de prueba)',
+    ].join('\n');
 
     let shown = false;
 
-    // 1. Intentar Notification API directa (escritorio, siempre disponible)
+    // 1. Notification API directa (más confiable en escritorio)
     try {
       const n = new Notification(title, {
-        body,
-        icon:  '/logo_panstock.png',
-        tag:   'panstock-test',
-        renotify: true,
+        body, icon: '/logo_panstock.png', tag: 'panstock-test', renotify: true,
       });
       n.onclick = () => { window.focus(); n.close(); };
       shown = true;
@@ -230,7 +244,7 @@ export default function NotificationSettingsModal({ onClose, onRequestPermission
       console.warn('[PanStock Test] Notification API falló:', e1.message);
     }
 
-    // 2. Si la API directa falla, intentar SW
+    // 2. Fallback SW (móvil)
     if (!shown && hasSW) {
       try {
         const reg = await navigator.serviceWorker.getRegistration('/');
@@ -250,13 +264,12 @@ export default function NotificationSettingsModal({ onClose, onRequestPermission
       setSent(true);
       setTimeout(() => setSent(false), 3000);
     } else {
-      setTestErr('No se pudo enviar la notificación. Verificá que los permisos estén habilitados en la configuración del navegador.');
+      setTestErr('No se pudo enviar. Verificá que los permisos estén habilitados en el navegador.');
     }
 
     await onTestNotification?.();
   };
 
-  // Detectar si estamos en móvil real para el layout del overlay
   const isNarrow = typeof window !== 'undefined' && window.innerWidth < 520;
 
   const content = (
@@ -267,8 +280,8 @@ export default function NotificationSettingsModal({ onClose, onRequestPermission
         background:'rgba(28,17,8,0.65)',
         backdropFilter:'blur(6px)', WebkitBackdropFilter:'blur(6px)',
         display:'flex',
-        alignItems:   isNarrow ? 'flex-end' : 'center',
-        justifyContent: 'center',
+        alignItems:    isNarrow ? 'flex-end' : 'center',
+        justifyContent:'center',
         padding: isNarrow ? 0 : 16,
       }}
     >
@@ -283,12 +296,12 @@ export default function NotificationSettingsModal({ onClose, onRequestPermission
         fontFamily:'"DM Sans",system-ui,sans-serif',
       }}>
 
-        {/* ─── HEADER (siempre visible, nunca scrolleable) ─── */}
+        {/* ─── HEADER ─── */}
         <div style={{
           display:'flex', alignItems:'flex-start', gap:12,
           padding:'18px 18px 14px',
           borderBottom:'1px solid #EDE6DB',
-          flexShrink: 0,   /* CRÍTICO: no colapsa */
+          flexShrink:0,
         }}>
           <div style={{ width:40, height:40, borderRadius:12, background:'rgba(200,137,58,0.12)',
             display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.1rem', flexShrink:0 }}>
@@ -311,16 +324,14 @@ export default function NotificationSettingsModal({ onClose, onRequestPermission
           >✕</button>
         </div>
 
-        {/* ─── BODY (scrolleable) ─── */}
+        {/* ─── BODY ─── */}
         <div
           ref={bodyRef}
           style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: '14px 18px',
-            display: 'flex', flexDirection: 'column', gap: 12,
-            /* Fuerza la altura mínima para que se vea contenido */
-            minHeight: 0,
+            flex:1, overflowY:'auto',
+            padding:'14px 18px',
+            display:'flex', flexDirection:'column', gap:12,
+            minHeight:0,
           }}
         >
 
@@ -343,24 +354,63 @@ export default function NotificationSettingsModal({ onClose, onRequestPermission
           </div>
 
           {/* 2. Permiso del navegador */}
-          <Card title="Permiso del navegador" right={<PermBadge p={!hasNotif ? 'unsupported' : browserPerm} />}>
+          <Card
+            title="Permiso del navegador"
+            right={<PermBadge p={!hasNotif ? 'unsupported' : browserPerm} />}
+          >
             {!hasNotif && (
               <AlertBox type="warning">
                 ⚠️ Tu navegador no soporta notificaciones. Usá Chrome, Firefox o Safari.
               </AlertBox>
             )}
+
             {hasNotif && browserPerm === 'denied' && (
-              <AlertBox type="error">
-                🚫 Notificaciones bloqueadas. Para habilitarlas:
-                <br/>Chrome: clic en 🔒 en la barra de dirección → Notificaciones → Permitir
-                <br/>Safari: Preferencias → Sitios web → Notificaciones → Permitir
-              </AlertBox>
+              <>
+                <AlertBox type="error">
+                  🚫 Notificaciones bloqueadas. Para habilitarlas de nuevo:
+                  <br/><strong>Chrome / Edge:</strong> clic en 🔒 en la barra de dirección → Notificaciones → Permitir
+                  <br/><strong>Firefox:</strong> clic en el candado → Permiso de notificaciones → Permitir
+                  <br/><strong>Safari:</strong> Preferencias → Sitios web → Notificaciones → Permitir
+                  <br/>Luego recargá la página.
+                </AlertBox>
+                <button
+                  onClick={() => {
+                    // Abrir la configuración del navegador (solo funciona en algunos browsers)
+                    if (navigator.permissions && navigator.permissions.query) {
+                      window.location.reload();
+                    }
+                  }}
+                  style={{
+                    padding:'10px 18px', background:'transparent',
+                    color:'#C0392B', border:'1.5px solid #C0392B', borderRadius:10,
+                    fontFamily:'inherit', fontSize:'0.85rem', fontWeight:700,
+                    cursor:'pointer', width:'100%',
+                  }}
+                >
+                  🔄 Recargar página tras habilitar en el navegador
+                </button>
+              </>
             )}
+
             {hasNotif && browserPerm === 'granted' && (
-              <AlertBox type="success">
-                ✅ Permiso concedido. Las notificaciones están listas para funcionar.
-              </AlertBox>
+              <>
+                <AlertBox type="success">
+                  ✅ Permiso concedido. Las notificaciones están listas.
+                </AlertBox>
+                <button
+                  onClick={handleDisable}
+                  style={{
+                    padding:'8px 14px', background:'transparent',
+                    color:'#8C7B6B', border:'1.5px solid #EDE6DB', borderRadius:10,
+                    fontFamily:'inherit', fontSize:'0.78rem', fontWeight:600,
+                    cursor:'pointer', width:'100%',
+                  }}
+                >
+                  Para revocar el permiso: usá la configuración del navegador (🔒 en la barra de URL)
+                </button>
+              </>
             )}
+
             {hasNotif && browserPerm === 'default' && (
               <>
                 <AlertBox type="info">
@@ -369,7 +419,8 @@ export default function NotificationSettingsModal({ onClose, onRequestPermission
                 <button
                   onClick={handleReq} disabled={req}
                   style={{
-                    padding:'12px 18px', background: req ? '#D4A853' : '#C8893A',
+                    padding:'12px 18px',
+                    background: req ? '#D4A853' : '#C8893A',
                     color:'white', border:'none', borderRadius:10,
                     fontFamily:'inherit', fontSize:'0.9rem', fontWeight:700,
                     cursor: req ? 'not-allowed' : 'pointer',
@@ -399,7 +450,12 @@ export default function NotificationSettingsModal({ onClose, onRequestPermission
               <div
                 onClick={() => { if (canToggle) dispatch(setEnabled(!enabled)); }}
                 role="switch" aria-checked={enabled} tabIndex={0}
-                onKeyDown={e => { if ((e.key===' '||e.key==='Enter') && canToggle) { e.preventDefault(); dispatch(setEnabled(!enabled)); }}}
+                onKeyDown={e => {
+                  if ((e.key===' '||e.key==='Enter') && canToggle) {
+                    e.preventDefault();
+                    dispatch(setEnabled(!enabled));
+                  }
+                }}
                 style={{
                   width:52, height:30, borderRadius:15,
                   background: canToggle && enabled ? '#C8893A' : '#EDE6DB',
@@ -419,14 +475,15 @@ export default function NotificationSettingsModal({ onClose, onRequestPermission
                 }}/>
               </div>
             </div>
-            {!canToggle && hasNotif && browserPerm !== 'denied' && (
+
+            {!canToggle && hasNotif && browserPerm === 'default' && (
               <div style={{ fontSize:'0.74rem', color:'#D68910' }}>
-                ⬆️ Concedé permiso al navegador en la sección de arriba para activar.
+                ⬆️ Concedé permiso al navegador (sección de arriba) para activar.
               </div>
             )}
             {!canToggle && hasNotif && browserPerm === 'denied' && (
               <div style={{ fontSize:'0.74rem', color:'#C0392B' }}>
-                🚫 Los permisos están bloqueados. Habilitálos desde la configuración del navegador.
+                🚫 Permisos bloqueados. Habilitálos desde la configuración del navegador.
               </div>
             )}
           </Card>
@@ -496,12 +553,12 @@ export default function NotificationSettingsModal({ onClose, onRequestPermission
             <Card title="Probar notificación">
               {browserPerm !== 'granted' ? (
                 <AlertBox type="warning">
-                  ⚠️ Necesitás conceder permiso primero (sección "Permiso del navegador" arriba).
+                  ⚠️ Concedé permiso primero (sección "Permiso del navegador" arriba).
                 </AlertBox>
               ) : (
                 <>
                   <div style={{ fontSize:'0.78rem', color:'#8C7B6B' }}>
-                    Enviá una notificación de prueba para verificar que todo funcione correctamente.
+                    Enviá una notificación de prueba que incluye producto, categoría, cantidad y fecha.
                   </div>
                   {testErr && <AlertBox type="error">{testErr}</AlertBox>}
                   <button
@@ -531,8 +588,8 @@ export default function NotificationSettingsModal({ onClose, onRequestPermission
               color:'#B5A898', fontWeight:600, marginBottom:7 }}>Soporte del navegador</div>
             <div style={{ display:'flex', flexWrap:'wrap', gap:10 }}>
               {[
-                ['Notifications API', hasNotif, false],
-                ['Service Worker',    hasSW,    false],
+                ['Notifications API', hasNotif,   false],
+                ['Service Worker',    hasSW,      false],
                 [isMobile ? '📱 Móvil' : '🖥️ Escritorio', true, true],
               ].map(([lbl, ok, info]) => (
                 <div key={lbl} style={{ display:'flex', alignItems:'center', gap:5,
@@ -547,10 +604,10 @@ export default function NotificationSettingsModal({ onClose, onRequestPermission
 
         </div>
 
-        {/* ─── FOOTER (siempre visible) ─── */}
+        {/* ─── FOOTER ─── */}
         <div style={{
           padding:'12px 18px', borderTop:'1px solid #EDE6DB',
-          flexShrink: 0,   /* CRÍTICO: no colapsa */
+          flexShrink:0,
           display:'flex', justifyContent:'flex-end',
           background:'#fff',
         }}>

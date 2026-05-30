@@ -23,65 +23,67 @@ import notificationsReducer from '../features/notifications/notificationsSlice';
 // ─── Persist configs ──────────────────────────────────────────────────────────
 
 const authPersistConfig = {
-  key: 'panstock-auth',
+  key:       'panstock-auth',
   storage,
   whitelist: ['token', 'user', 'isAuthenticated'],
 };
 
 const categoriesPersistConfig = {
-  key: 'panstock-categories',
+  key:       'panstock-categories',
   storage,
   whitelist: ['items'],
 };
 
 const productsPersistConfig = {
-  key: 'panstock-products',
+  key:       'panstock-products',
   storage,
-  // Los filtros no persisten; cada login empieza limpio
   whitelist: ['items'],
 };
 
 const suppliersPersistConfig = {
-  key: 'panstock-suppliers',
+  key:       'panstock-suppliers',
   storage,
   whitelist: ['items'],
 };
 
 const wastePersistConfig = {
-  key: 'panstock-waste',
+  key:       'panstock-waste',
   storage,
-  // Solo se persiste la lista de usuarios para el dropdown del OWNER
   whitelist: ['users'],
 };
 
 /**
- * notificationsPersistConfig
+ * notificationsPersistConfig — CORREGIDO
  *
- * Persistimos las PREFERENCIAS del usuario (enabled, channel, interval, daysAhead)
- * para que sobrevivan a recargas de página.
+ * Se agrega 'permission' a la whitelist.
  *
- * NO persistimos:
- *  - permission: se re-lee del navegador en cada sesión
+ * RAZÓN: Sin persistir 'permission', al recargar la página el store arrancaba
+ * en 'default' aunque el navegador ya tuviese 'granted'. El hook leía el valor
+ * del store y nunca arrancaba el intervalo de chequeo → notificaciones silenciosas.
+ *
+ * El hook sincroniza el permiso real del navegador vía syncPermission() con un
+ * pequeño delay post-mount, por lo que si el usuario revocó el permiso en el
+ * browser entre sesiones, se corrige automáticamente.
+ *
+ * NO se persisten:
  *  - swRegistered: el SW se re-registra en cada inicio
- *  - lastCheckAt: se resetea para forzar un chequeo fresco
- *  - notifiedBatchIds: se regeneran en cada sesión para no silenciar alertas
- *    si el usuario estuvo ausente varios días
+ *  - lastCheckAt: resetear para forzar chequeo fresco en cada sesión
+ *  - notifiedBatchIds: se regeneran para no silenciar alertas tras días de ausencia
  */
 const notificationsPersistConfig = {
-  key: 'panstock-notifications',
+  key:       'panstock-notifications',
   storage,
-  whitelist: ['enabled', 'channel', 'intervalMinutes', 'alertDaysAhead'],
+  whitelist: [
+    'enabled',
+    'channel',
+    'intervalMinutes',
+    'alertDaysAhead',
+    'permission',          // ← NUEVO: persiste el permiso para que el intervalo
+                           //   arranque correctamente en recargas de página
+  ],
 };
 
-// ── expiration: sin persist (time-sensitive, siempre se refresca) ─────────────
-
 // ─── Root Reducer con reset en logout ────────────────────────────────────────
-//
-// Al hacer logout, reseteamos todo excepto auth (que gestiona su propio estado)
-// y notifications (para preservar las preferencias del usuario entre sesiones
-// del mismo navegador — el usuario no debería tener que re-configurar la campana
-// cada vez que cierra sesión).
-// ─────────────────────────────────────────────────────────────────────────────
 
 const appReducer = combineReducers({
   auth:          persistReducer(authPersistConfig,          authReducer),
@@ -96,8 +98,6 @@ const appReducer = combineReducers({
 
 const rootReducer = (state, action) => {
   if (action.type === 'auth/logout') {
-    // Preservar auth (para que redux-persist no se confunda)
-    // y notifications (para que las preferencias del usuario sobrevivan al logout)
     const { auth, notifications } = state;
     return appReducer({ auth, notifications }, action);
   }

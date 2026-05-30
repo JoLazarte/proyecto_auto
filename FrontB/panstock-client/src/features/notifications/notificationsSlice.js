@@ -1,28 +1,29 @@
 /**
- * notificationsSlice.js
+ * notificationsSlice.js — v2 FIXED
  *
- * Gestiona el estado de las notificaciones de vencimiento:
- *  - preferencias del usuario (habilitado, canal, intervalo)
- *  - último check
- *  - IDs de lotes ya notificados (para no repetir)
+ * Correcciones vs v1:
+ *  - 'permission' ahora SE PERSISTE (estaba en whitelist vacío → al recargar
+ *    volvía a 'default' y el intervalo nunca arrancaba aunque el browser ya
+ *    tuviese permiso concedido)
+ *  - Se agrega 'syncPermission': lee el valor REAL del navegador y lo guarda,
+ *    llamado al montar el hook DESPUÉS del rehydrate de redux-persist
  */
 import { createSlice } from '@reduxjs/toolkit';
 
 const initialState = {
   // ── Preferencias ──────────────────────────────────────
-  enabled:          false,   // notificaciones habilitadas globalmente
-  channel:          'auto',  // 'auto' | 'desktop' | 'push'
-  intervalMinutes:  30,      // cada cuántos minutos revisar
-  alertDaysAhead:   2,       // días de anticipación para alertar
+  enabled:          false,
+  channel:          'auto',
+  intervalMinutes:  30,
+  alertDaysAhead:   2,
 
   // ── Estado de permisos ────────────────────────────────
-  permission:       'default', // 'default' | 'granted' | 'denied'
+  // AHORA SE PERSISTE para que el intervalo arranque en recargas
+  permission:       'default',   // 'default' | 'granted' | 'denied' | 'unsupported'
   swRegistered:     false,
 
   // ── Tracking de notificaciones enviadas ───────────────
-  // Guardamos los batchId ya notificados con su fecha de vencimiento
-  // para no re-notificar en el mismo ciclo
-  notifiedBatchIds: [], // [{ batchId, expirationDate, notifiedAt }]
+  notifiedBatchIds: [],          // [{ batchId, expirationDate, notifiedAt }]
 
   // ── Último check ──────────────────────────────────────
   lastCheckAt:      null,
@@ -47,23 +48,30 @@ const notificationsSlice = createSlice({
     setPermission(state, action) {
       state.permission = action.payload;
     },
+    /**
+     * syncPermission: lee el permiso REAL del navegador y lo sincroniza al store.
+     * Llamado al montar el hook, DESPUÉS del rehydrate, para corregir posibles
+     * valores cacheados incorrectos (ej: 'default' en store pero 'granted' en browser).
+     */
+    syncPermission(state) {
+      if (typeof window === 'undefined' || !('Notification' in window)) {
+        state.permission = 'unsupported';
+      } else {
+        state.permission = Notification.permission;
+      }
+    },
     setSwRegistered(state, action) {
       state.swRegistered = action.payload;
     },
     markBatchNotified(state, action) {
-      // action.payload: { batchId, expirationDate }
+      const { batchId, expirationDate } = action.payload;
       const exists = state.notifiedBatchIds.find(
-        (n) => n.batchId === action.payload.batchId
-          && n.expirationDate === action.payload.expirationDate
+        (n) => n.batchId === batchId && n.expirationDate === expirationDate
       );
       if (!exists) {
-        state.notifiedBatchIds.push({
-          ...action.payload,
-          notifiedAt: Date.now(),
-        });
+        state.notifiedBatchIds.push({ batchId, expirationDate, notifiedAt: Date.now() });
       }
     },
-    // Limpia los IDs notificados que ya pasaron su fecha de vencimiento
     cleanStaleNotified(state) {
       const now = new Date().toISOString().split('T')[0];
       state.notifiedBatchIds = state.notifiedBatchIds.filter(
@@ -73,14 +81,14 @@ const notificationsSlice = createSlice({
     setLastCheckAt(state, action) {
       state.lastCheckAt = action.payload;
     },
-    // Reset completo de preferencias (sin borrar permission, se re-solicita)
     resetNotificationPrefs(state) {
-      state.enabled         = false;
-      state.channel         = 'auto';
-      state.intervalMinutes = 30;
-      state.alertDaysAhead  = 2;
+      state.enabled          = false;
+      state.channel          = 'auto';
+      state.intervalMinutes  = 30;
+      state.alertDaysAhead   = 2;
       state.notifiedBatchIds = [];
-      state.lastCheckAt     = null;
+      state.lastCheckAt      = null;
+      // NO resetear permission: el usuario ya dio permiso en el browser
     },
   },
 });
@@ -91,6 +99,7 @@ export const {
   setIntervalMinutes,
   setAlertDaysAhead,
   setPermission,
+  syncPermission,
   setSwRegistered,
   markBatchNotified,
   cleanStaleNotified,
@@ -99,13 +108,13 @@ export const {
 } = notificationsSlice.actions;
 
 // ── Selectors ─────────────────────────────────────────────
-export const selectNotifEnabled       = (s) => s.notifications.enabled;
-export const selectNotifChannel       = (s) => s.notifications.channel;
-export const selectNotifInterval      = (s) => s.notifications.intervalMinutes;
-export const selectNotifDaysAhead     = (s) => s.notifications.alertDaysAhead;
-export const selectNotifPermission    = (s) => s.notifications.permission;
-export const selectSwRegistered       = (s) => s.notifications.swRegistered;
-export const selectNotifiedBatchIds   = (s) => s.notifications.notifiedBatchIds;
-export const selectLastCheckAt        = (s) => s.notifications.lastCheckAt;
+export const selectNotifEnabled     = (s) => s.notifications.enabled;
+export const selectNotifChannel     = (s) => s.notifications.channel;
+export const selectNotifInterval    = (s) => s.notifications.intervalMinutes;
+export const selectNotifDaysAhead   = (s) => s.notifications.alertDaysAhead;
+export const selectNotifPermission  = (s) => s.notifications.permission;
+export const selectSwRegistered     = (s) => s.notifications.swRegistered;
+export const selectNotifiedBatchIds = (s) => s.notifications.notifiedBatchIds;
+export const selectLastCheckAt      = (s) => s.notifications.lastCheckAt;
 
 export default notificationsSlice.reducer;
