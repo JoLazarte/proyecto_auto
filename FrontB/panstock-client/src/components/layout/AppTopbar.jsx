@@ -19,14 +19,12 @@ export default function AppTopbar() {
   const user        = useSelector(selectUser);
   const token       = useSelector(selectToken);
 
-  // Selectores individuales (primitivos) — sin re-renders innecesarios
   const greenCount   = useSelector(selectGreenCount);
   const yellowCount  = useSelector(selectYellowCount);
   const redCount     = useSelector(selectRedCount);
   const expiredCount = useSelector(selectExpiredCount);
   const urgentCount  = expiredCount + redCount + yellowCount;
 
-  // UN solo punto de montaje para el polling de notificaciones
   const { requestPermission } = useNotifications();
 
   useEffect(() => {

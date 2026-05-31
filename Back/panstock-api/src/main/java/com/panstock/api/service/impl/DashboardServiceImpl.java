@@ -10,7 +10,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -21,10 +20,9 @@ public class DashboardServiceImpl implements DashboardService {
     private final StockService stockService;
 
     /**
-     * Semáforo de vencimientos:
-     * - getExpiring(null)  → todos los lotes disponibles con fecha, no vencidos, ordenados por urgencia
-     * - getExpired()       → todos los lotes vencidos (cualquier batch_status)
-     * Combina ambas listas y devuelve conteos por color + lista completa.
+     * Semáforo de vencimientos.
+     * Los items incluyen categoryName para que el frontend pueda mostrarlo
+     * en las notificaciones push sin necesitar una llamada adicional.
      */
     @Override
     public DashboardSemaphoreResponse getExpirationSemaphore() {
@@ -32,8 +30,8 @@ public class DashboardServiceImpl implements DashboardService {
         List<ExpirationItemResponse> expired  = stockService.getExpired();
 
         List<ExpirationItemResponse> items = new ArrayList<>();
-        items.addAll(expired);   // primero los vencidos
-        items.addAll(expiring);  // luego los próximos (ya vienen ordenados por urgencia)
+        items.addAll(expired);
+        items.addAll(expiring);
 
         long greenCount   = items.stream().filter(i -> i.status() == ExpirationStatus.GREEN).count();
         long yellowCount  = items.stream().filter(i -> i.status() == ExpirationStatus.YELLOW).count();
