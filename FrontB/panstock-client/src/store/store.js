@@ -1,13 +1,7 @@
 import { configureStore, combineReducers } from '@reduxjs/toolkit';
 import {
-  persistStore,
-  persistReducer,
-  FLUSH,
-  REHYDRATE,
-  PAUSE,
-  PERSIST,
-  PURGE,
-  REGISTER,
+  persistStore, persistReducer,
+  FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER,
 } from 'redux-persist';
 import storage from 'redux-persist/es/storage';
 
@@ -20,70 +14,37 @@ import stockReducer         from '../features/stock/stockSlice';
 import wasteReducer         from '../features/waste/wasteSlice';
 import notificationsReducer from '../features/notifications/notificationsSlice';
 
-// ─── Persist configs ──────────────────────────────────────────────────────────
-
 const authPersistConfig = {
-  key:       'panstock-auth',
-  storage,
+  key: 'panstock-auth', storage,
   whitelist: ['token', 'user', 'isAuthenticated'],
 };
-
 const categoriesPersistConfig = {
-  key:       'panstock-categories',
-  storage,
+  key: 'panstock-categories', storage,
   whitelist: ['items'],
 };
-
 const productsPersistConfig = {
-  key:       'panstock-products',
-  storage,
+  key: 'panstock-products', storage,
   whitelist: ['items'],
 };
-
 const suppliersPersistConfig = {
-  key:       'panstock-suppliers',
-  storage,
+  key: 'panstock-suppliers', storage,
   whitelist: ['items'],
 };
-
 const wastePersistConfig = {
-  key:       'panstock-waste',
-  storage,
+  key: 'panstock-waste', storage,
   whitelist: ['users'],
 };
 
-/**
- * notificationsPersistConfig — CORREGIDO
- *
- * Se agrega 'permission' a la whitelist.
- *
- * RAZÓN: Sin persistir 'permission', al recargar la página el store arrancaba
- * en 'default' aunque el navegador ya tuviese 'granted'. El hook leía el valor
- * del store y nunca arrancaba el intervalo de chequeo → notificaciones silenciosas.
- *
- * El hook sincroniza el permiso real del navegador vía syncPermission() con un
- * pequeño delay post-mount, por lo que si el usuario revocó el permiso en el
- * browser entre sesiones, se corrige automáticamente.
- *
- * NO se persisten:
- *  - swRegistered: el SW se re-registra en cada inicio
- *  - lastCheckAt: resetear para forzar chequeo fresco en cada sesión
- *  - notifiedBatchIds: se regeneran para no silenciar alertas tras días de ausencia
- */
 const notificationsPersistConfig = {
-  key:       'panstock-notifications',
-  storage,
+  key: 'panstock-notifications', storage,
   whitelist: [
     'enabled',
     'channel',
     'intervalMinutes',
     'alertDaysAhead',
-    'permission',          // ← NUEVO: persiste el permiso para que el intervalo
-                           //   arranque correctamente en recargas de página
+    'permission',
   ],
 };
-
-// ─── Root Reducer con reset en logout ────────────────────────────────────────
 
 const appReducer = combineReducers({
   auth:          persistReducer(authPersistConfig,          authReducer),
@@ -103,8 +64,6 @@ const rootReducer = (state, action) => {
   }
   return appReducer(state, action);
 };
-
-// ─── Store ────────────────────────────────────────────────────────────────────
 
 export const store = configureStore({
   reducer: rootReducer,
