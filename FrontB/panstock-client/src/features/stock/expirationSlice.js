@@ -68,7 +68,7 @@ const expirationSlice = createSlice({
 export const { clearExpirationState } = expirationSlice.actions;
 
 // ── Selectores INDIVIDUALES (primitivos) ──────────────────────────────────────
-// IMPORTANTE: cada selector devuelve un primitivo (number/string),
+// Cada selector devuelve un primitivo (number/string),
 // NO un objeto. Esto evita el warning de react-redux sobre re-renders
 // innecesarios por referencias distintas en cada llamada.
 
