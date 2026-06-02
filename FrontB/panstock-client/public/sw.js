@@ -96,7 +96,7 @@ self.addEventListener('notificationclick', (event) => {
    
    Este handler espera a que el SW esté activo antes de mostrar la notif
    usando event.waitUntil() para que macOS no mate el SW en medio.
-   ────────────────────────────────────────────────────────────────────────── */
+   ──────────────────────────────────────────────────────────────────────── */
 self.addEventListener('message', (event) => {
   if (!event.data) return;
 
