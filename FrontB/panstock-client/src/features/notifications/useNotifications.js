@@ -7,6 +7,7 @@ import {
   selectNotifDaysAhead,
   selectNotifPermission,
   selectNotifiedBatchIds,
+  selectResetToken,
   syncPermission,
   setPermission,
   setSwRegistered,
@@ -49,10 +50,7 @@ export function getBrowserPermission() {
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
-   FECHA LOCAL DEL CLIENTE (sin depender de timezone del servidor)
-   Devuelve YYYY-MM-DD usando el offset del navegador del usuario.
-   Esto evita el bug de macOS donde new Date().toISOString() devuelve
-   la fecha UTC que en Argentina (UTC-3) puede ser el día anterior.
+   FECHA LOCAL DEL CLIENTE
    ─────────────────────────────────────────────────────────────────────────── */
 function todayLocal() {
   return new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
@@ -61,9 +59,15 @@ function todayLocal() {
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
-   SW REGISTRATION — espera a estado 'activated' antes de retornar.
-   Crítico en macOS: showNotification() lanza InvalidStateError si el SW
-   no está en estado 'active'.
+   Construye la clave de dedup para el Set local.
+   Formato: "batchId|expirationDate|notifiedDate"
+   ─────────────────────────────────────────────────────────────────────────── */
+function dedupKey(batchId, expirationDate, notifiedDate) {
+  return `${batchId}|${expirationDate}|${notifiedDate}`;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   SW REGISTRATION
    ─────────────────────────────────────────────────────────────────────────── */
 async function registerAndWaitSW() {
   if (!supportsServiceWorker()) return null;
@@ -99,7 +103,7 @@ async function requestPermissionNative() {
 /* ────────────────────────────────────────────────────────────────────────────
    ENVIAR NOTIFICACIÓN
    Orden de preferencia (macOS-safe):
-   1. SW postMessage → sw.showNotification  [más confiable en macOS]
+   1. SW postMessage → sw.showNotification
    2. reg.showNotification() directo
    3. new Notification() — SOLO si no es macOS
    ─────────────────────────────────────────────────────────────────────────── */
@@ -119,7 +123,7 @@ async function sendNotif({ title, body, tag, url }) {
 
   const onMac = isMacOS();
 
-  /* Intento 1: SW postMessage (prioritario en macOS) */
+  /* Intento 1: SW postMessage */
   if (supportsServiceWorker()) {
     try {
       let reg = await navigator.serviceWorker.getRegistration('/');
@@ -212,28 +216,75 @@ export default function useNotifications() {
   const token            = useSelector(selectToken);
   const enabled          = useSelector(selectNotifEnabled);
   const intervalMinutes  = useSelector(selectNotifInterval);
-  const daysAhead        = useSelector(selectNotifDaysAhead);  // ← en deps del intervalo
+  const daysAhead        = useSelector(selectNotifDaysAhead);
   const storedPermission = useSelector(selectNotifPermission);
   const notifiedBatchIds = useSelector(selectNotifiedBatchIds);
+  // resetToken cambia cada vez que se limpia notifiedBatchIds desde Redux
+  // (por cambio de alertDaysAhead u otras acciones de reset).
+  const resetToken       = useSelector(selectResetToken);
 
-  const swRegRef      = useRef(null);
-  const tokenRef      = useRef(token);
-  const daysAheadRef  = useRef(daysAhead);
-  const notifiedRef   = useRef(notifiedBatchIds);
-  const intervalRef   = useRef(null);
-  const permissionRef = useRef(storedPermission);
+  const swRegRef     = useRef(null);
+  const intervalRef  = useRef(null);
 
-  useEffect(() => { tokenRef.current      = token;            }, [token]);
-  useEffect(() => { daysAheadRef.current  = daysAhead;        }, [daysAhead]);
-  useEffect(() => { notifiedRef.current   = notifiedBatchIds; }, [notifiedBatchIds]);
-  useEffect(() => { permissionRef.current = storedPermission; }, [storedPermission]);
+  /*
+   * ── localNotifiedRef ──────────────────────────────────────────────────────
+   *
+   * FUENTE DE VERDAD para el dedup dentro de la sesión activa.
+   *
+   * POR QUÉ UN Set LOCAL EN LUGAR DE notifiedBatchIds DE REDUX:
+   *
+   * En macOS el store Redux persiste en memoria mientras la pestaña esté
+   * abierta. Pero `notifiedBatchIds` en Redux solo es accesible desde el
+   * hook vía `useSelector`, cuyo valor se actualiza en el próximo render
+   * de React — un proceso asíncrono. Esto crea una ventana de tiempo donde:
+   *
+   *   1. `setAlertDaysAhead` limpia `notifiedBatchIds` en Redux.
+   *   2. El `useEffect` del intervalo se re-ejecuta y llama `checkExpirations`.
+   *   3. `checkExpirations` lee `notifiedBatchIds` vía selector (o ref
+   *      actualizada por useEffect) y obtiene el array VIEJO porque React
+   *      no terminó de re-renderizar.
+   *   4. Los lotes del rango previo (ej. 1-2 días) siguen pareciendo
+   *      "ya notificados", y solo se notifican los nuevos (ej. 7 días).
+   *
+   * Con `localNotifiedRef` (un Set de JavaScript puro, sin React ni Redux):
+   *
+   *   - Las lecturas y escrituras son síncronas e inmediatas.
+   *   - `checkExpirations` siempre ve el estado real del dedup.
+   *   - Cuando Redux dice "limpiar" (via resetToken), borramos el Set
+   *     de forma síncrona en el mismo efecto que detecta el cambio,
+   *     ANTES de que corra el primer checkExpirations.
+   *
+   * Redux (`notifiedBatchIds`) se mantiene como backup para persistencia
+   * entre sesiones: al montar el hook, precargamos el Set desde Redux.
+   * Al notificar, escribimos en ambos (Set + Redux).
+   * ─────────────────────────────────────────────────────────────────────────
+   */
+  const localNotifiedRef = useRef(null);
+
+  // Inicializar el Set local UNA SOLA VEZ desde el estado persistido en Redux.
+  // Solo corremos esto en el mount — después, localNotifiedRef es la fuente
+  // de verdad y Redux es el respaldo.
+  if (localNotifiedRef.current === null) {
+    const today = todayLocal();
+    localNotifiedRef.current = new Set(
+      (notifiedBatchIds || [])
+        .filter((n) => n.expirationDate >= today && n.notifiedDate >= today)
+        .map((n) => dedupKey(n.batchId, n.expirationDate, n.notifiedDate))
+    );
+  }
+
+  // Refs para valores que checkExpirations necesita leer sin causar
+  // re-renders ni problemas de closure stale.
+  const tokenRef     = useRef(token);
+  const daysAheadRef = useRef(daysAhead);
+  // Actualizamos síncronamente en el cuerpo del hook (no en useEffect)
+  // para que siempre estén frescos antes de que cualquier effect corra.
+  tokenRef.current     = token;
+  daysAheadRef.current = daysAhead;
 
   /* ── Sync permiso: polling cada 2s ──────────────────────────────────────── */
   useEffect(() => {
-    const sync = () => {
-      dispatch(syncPermission());
-      permissionRef.current = getBrowserPermission();
-    };
+    const sync = () => dispatch(syncPermission());
     sync();
     const id = setInterval(sync, 2000);
     return () => clearInterval(id);
@@ -250,24 +301,38 @@ export default function useNotifications() {
     });
   }, [dispatch]);
 
+  /*
+   * ── RESET del Set local cuando Redux señala limpieza ─────────────────────
+   *
+   * `resetToken` cambia cuando:
+   *   - El usuario cambia alertDaysAhead
+   *   - Se llama resetNotifiedForDaysChange
+   *   - Se llama resetNotificationPrefs
+   *
+   * Este effect corre SÍNCRONAMENTE (antes del paint) cuando detecta el
+   * cambio de token, limpiando el Set local. Así, cuando el useEffect del
+   * intervalo (que también tiene resetToken en sus deps) corra, el Set ya
+   * está vacío y checkExpirations notificará todos los lotes en el nuevo rango.
+   *
+   * También limpiamos Redux (entradas stale del día anterior).
+   * ─────────────────────────────────────────────────────────────────────────
+   */
+  useEffect(() => {
+    // Limpiar el Set local de forma síncrona
+    if (localNotifiedRef.current) {
+      localNotifiedRef.current.clear();
+    } else {
+      localNotifiedRef.current = new Set();
+    }
+    // Limpiar también entradas stale en Redux
+    dispatch(cleanStaleNotified());
+  }, [resetToken, dispatch]);
+
   /* ────────────────────────────────────────────────────────────────────────
      checkExpirations
      ─────────────────────────────────────────────────────────────────────────
-     LÓGICA DE DEDUPLICACIÓN (corregida para macOS):
-
-     Key de "ya notificado": (batchId, expirationDate, notifiedDate)
-     donde notifiedDate = todayLocal() = YYYY-MM-DD del cliente.
-
-     Esto significa:
-     - Un lote se notifica UNA VEZ POR DÍA mientras esté en rango.
-     - Al día siguiente, notifiedDate cambia → se vuelve a notificar.
-     - cleanStaleNotified() elimina entradas del día anterior,
-       manteniendo el store limpio.
-
-     Diferencia con la versión anterior:
-     - Antes: key = (batchId, expirationDate) → notificado una sola vez
-       para siempre. En macOS donde el store persiste sin refresh, esto
-       hacía que lotes con 1-6 días restantes nunca se volvieran a notificar.
+     Usa localNotifiedRef (Set) como fuente de verdad para el dedup.
+     Lee siempre desde refs para valores que cambian frecuentemente.
   ── */
   const checkExpirations = useCallback(async () => {
     const tkn  = tokenRef.current;
@@ -281,11 +346,23 @@ export default function useNotifications() {
     try {
       const items = await fetchSemaphore(tkn);
       dispatch(setLastCheckAt(Date.now()));
-      dispatch(cleanStaleNotified());
       dispatch(syncPermission());
 
       const days  = daysAheadRef.current;
       const today = todayLocal();
+
+      // Limpiar entradas del día anterior del Set local
+      if (localNotifiedRef.current) {
+        for (const key of localNotifiedRef.current) {
+          // Las keys tienen formato "batchId|expirationDate|notifiedDate"
+          const parts = key.split('|');
+          const notifiedDate   = parts[2];
+          const expirationDate = parts[1];
+          if (!notifiedDate || notifiedDate < today || !expirationDate || expirationDate < today) {
+            localNotifiedRef.current.delete(key);
+          }
+        }
+      }
 
       const urgent = items.filter(
         (i) => i.daysToExpire != null && i.daysToExpire >= 0 && i.daysToExpire <= days
@@ -295,22 +372,20 @@ export default function useNotifications() {
 
       const groups = {};
       for (const item of urgent) {
-        /* ── Dedup: (batchId, expirationDate, notifiedDate=hoy) ────────────
-           Si ya se notificó HOY este lote → saltar.
-           Mañana notifiedDate será diferente → se vuelve a notificar.
-        ── */
-        const alreadyNotified = notifiedRef.current.some(
-          (n) =>
-            n.batchId        === item.batchId        &&
-            n.expirationDate === item.expirationDate &&
-            n.notifiedDate   === today
-        );
-        if (alreadyNotified) continue;
+        const key = dedupKey(item.batchId, item.expirationDate, today);
 
+        // Dedup usando el Set local — lectura y escritura síncronas,
+        // sin depender de React render ni de refs actualizadas por useEffect.
+        if (localNotifiedRef.current.has(key)) continue;
+
+        // Marcar de inmediato en el Set local (síncrono)
+        localNotifiedRef.current.add(key);
+
+        // Marcar también en Redux para persistencia entre sesiones
         dispatch(markBatchNotified({
           batchId:        item.batchId,
           expirationDate: item.expirationDate,
-          notifiedDate:   today,          // ← nuevo campo
+          notifiedDate:   today,
         }));
 
         if (!groups[item.productId]) {
@@ -323,66 +398,88 @@ export default function useNotifications() {
         groups[item.productId].batches.push(item);
       }
 
-      for (const group of Object.values(groups)) {
-        if (!group.batches.length) continue;
-        group.batches.sort((a, b) => a.daysToExpire - b.daysToExpire);
+      /*
+       * NOTIFICACIÓN CONSOLIDADA — una sola notificación con todos los
+       * productos urgentes no notificados aún.
+       *
+       * POR QUÉ: en macOS, Chrome apila las notificaciones web en el
+       * Notification Center usando el `tag` como agrupador. Si se envían
+       * N notificaciones con distintos tags, macOS muestra solo la ÚLTIMA
+       * en el banner y esconde las anteriores detrás de ella. El usuario
+       * no sabe que hay más hasta que expande el grupo en el NC.
+       *
+       * Solución: una única notificación con tag fijo "panstock-expiration"
+       * que lista todos los productos urgentes en el cuerpo. Esto funciona
+       * igual en Windows y Linux (donde también es mejor UX tener un solo
+       * banner que N banners superpuestos).
+       *
+       * DEDUP: el tag fijo hace que macOS/Chrome REEMPLACE la notificación
+       * anterior en lugar de apilar una nueva (renotify: true). Así, si el
+       * intervalo corre de nuevo, la notificación se actualiza en lugar de
+       * acumularse.
+       */
+      const groupList = Object.values(groups).filter((g) => g.batches.length > 0);
+      if (groupList.length === 0) return;
+
+      // Ordenar productos: primero los que vencen antes
+      groupList.forEach((g) => g.batches.sort((a, b) => a.daysToExpire - b.daysToExpire));
+      groupList.sort((a, b) => a.batches[0].daysToExpire - b.batches[0].daysToExpire);
+
+      // Título: menciona el producto más urgente + cuántos más hay
+      const firstGroup = groupList[0];
+      const firstBatch = firstGroup.batches[0];
+      const firstDaysText = firstBatch.daysToExpire === 0
+        ? 'vence HOY'
+        : firstBatch.daysToExpire === 1
+          ? 'vence mañana'
+          : `vence en ${firstBatch.daysToExpire} días`;
+
+      const title = groupList.length === 1
+        ? `PanStock — ${firstGroup.productName} ${firstDaysText}`
+        : `PanStock — ${firstGroup.productName} y ${groupList.length - 1} producto${groupList.length - 1 > 1 ? 's' : ''} más por vencer`;
+
+      // Cuerpo: una línea por producto
+      const bodyLines = groupList.map((group) => {
         const b = group.batches[0];
-
-        const daysText = b.daysToExpire === 0
-          ? 'vence HOY'
+        const daysLabel = b.daysToExpire === 0
+          ? 'HOY'
           : b.daysToExpire === 1
-            ? 'vence mañana'
-            : `vence en ${b.daysToExpire} días`;
-
-        const expStr = b.expirationDate
-          ? new Date(b.expirationDate + 'T00:00:00').toLocaleDateString('es-AR', {
-              day: '2-digit', month: 'long', year: 'numeric',
-            })
-          : '—';
-
+            ? 'mañana'
+            : `en ${b.daysToExpire}d`;
         const totalQty = group.batches.reduce(
           (sum, lote) => sum + Number(lote.currentQuantity || 0), 0
         );
-        const catStr = group.categoryName ? `Categoría: ${group.categoryName}` : null;
+        const batchSuffix = group.batches.length > 1
+          ? ` (${group.batches.length} lotes)`
+          : '';
+        return `• ${group.productName} — vence ${daysLabel} · ${totalQty.toLocaleString('es-AR')} u.${batchSuffix}`;
+      });
 
-        const bodyLines = [
-          catStr,
-          `Vence: ${expStr}`,
-          `Cantidad en riesgo: ${totalQty.toLocaleString('es-AR')} u.`,
-          group.batches.length > 1 ? `(${group.batches.length} lotes afectados)` : null,
-        ].filter(Boolean).join('\n');
-
-        await sendNotif({
-          title: `PanStock — ${group.productName} ${daysText}`,
-          body:  bodyLines,
-          tag:   `panstock-exp-${b.batchId}-${b.expirationDate}`,
-          url:   '/expiration',
-        });
-      }
+      await sendNotif({
+        title,
+        body:  bodyLines.join('\n'),
+        // Tag fijo: macOS reemplaza la notificación anterior en vez de apilar
+        tag:   'panstock-expiration',
+        url:   '/expiration',
+      });
     } catch (err) {
       console.warn('[PanStock Notif] Error en chequeo:', err.message);
     }
   }, [dispatch]);
+  // checkExpirations NO tiene daysAhead en sus deps porque lo lee desde
+  // daysAheadRef.current (actualizado síncronamente en el cuerpo del hook).
 
   /* ────────────────────────────────────────────────────────────────────────
      INTERVALO DE POLLING
 
-     CAMBIO CLAVE (Bug 1):
-     Se agrega `daysAhead` a las dependencias del useEffect.
-
-     Cuando el usuario cambia alertDaysAhead en el modal:
-     1. notificationsSlice.setAlertDaysAhead() limpia notifiedBatchIds (slice)
-     2. daysAhead cambia en el store → React re-renderiza → este useEffect
-        se re-ejecuta → se cancela el intervalo viejo → se lanza
-        checkExpirations() inmediatamente con el nuevo rango de días.
-
-     Sin esto (versión anterior): el intervalo seguía corriendo con la
-     función anterior, y aunque daysAheadRef.current se actualizaba,
-     el check no se disparaba hasta el siguiente tick del setInterval
-     (que podía ser en 30 minutos). En macOS esto era especialmente
-     notable porque el store persistente hacía que los lotes del nuevo
-     rango ya estuvieran en notifiedBatchIds (del check anterior con
-     menos días), bloqueando las notificaciones.
+     DEPENDENCIAS:
+     - `daysAhead`: lanzar check inmediato cuando el usuario cambia los días.
+     - `resetToken`: lanzar check inmediato DESPUÉS de que el Set local fue
+       limpiado (el effect de reset corre antes que este, garantizado por
+       el orden de los useEffect en React). Así todos los lotes del nuevo
+       rango se notifican sin que el Set viejo los bloquee.
+     - Resto de deps estándar: enabled, token, intervalMinutes, permission.
+     ─────────────────────────────────────────────────────────────────────
   ── */
   useEffect(() => {
     if (intervalRef.current) {
@@ -396,7 +493,8 @@ export default function useNotifications() {
     if (!supportsNotifications())  return;
     if (perm !== 'granted')        return;
 
-    /* Disparo inmediato: corre el check ahora con el daysAhead actual */
+    // Disparo inmediato. En este punto localNotifiedRef ya fue limpiado
+    // por el effect de reset (los effects corren en orden de declaración).
     checkExpirations();
 
     const ms = intervalMinutes * 60 * 1000;
@@ -408,14 +506,20 @@ export default function useNotifications() {
         intervalRef.current = null;
       }
     };
-    // daysAhead en deps: cuando cambia → re-ejecuta el effect → check inmediato
-  }, [enabled, token, intervalMinutes, daysAhead, storedPermission, checkExpirations]);
+  }, [
+    enabled,
+    token,
+    intervalMinutes,
+    daysAhead,
+    storedPermission,
+    checkExpirations,
+    resetToken, // garantiza que el check corre DESPUÉS del reset del Set local
+  ]);
 
   return {
     requestPermission: async () => {
       const result = await requestPermissionNative();
       dispatch(setPermission(result));
-      permissionRef.current = result;
       if (result === 'granted') {
         registerAndWaitSW().then((reg) => {
           if (reg) {

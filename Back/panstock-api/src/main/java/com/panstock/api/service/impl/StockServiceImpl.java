@@ -317,10 +317,7 @@ public class StockServiceImpl implements StockService {
                         "Usuario no encontrado con id " + userId));
     }
 
-    /**
-     * Construye ExpirationItemResponse incluyendo el nombre de la categoría
-     * del producto, necesario para las notificaciones push del frontend.
-     */
+    
     private ExpirationItemResponse toExpirationItem(InventoryBatch batch) {
         Long daysToExpire = batch.getExpirationDate() != null
                 ? ChronoUnit.DAYS.between(LocalDate.now(ZONE), batch.getExpirationDate())

@@ -19,11 +19,7 @@ public class DashboardServiceImpl implements DashboardService {
 
     private final StockService stockService;
 
-    /**
-     * Semáforo de vencimientos.
-     * Los items incluyen categoryName para que el frontend pueda mostrarlo
-     * en las notificaciones push sin necesitar una llamada adicional.
-     */
+   
     @Override
     public DashboardSemaphoreResponse getExpirationSemaphore() {
         List<ExpirationItemResponse> expiring = stockService.getExpiring(null);

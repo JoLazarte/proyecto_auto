@@ -1,39 +1,18 @@
 import { createSlice } from '@reduxjs/toolkit';
 
-/* ────────────────────────────────────────────────────────────────────────────
-   notificationsSlice — v2
-
-   CAMBIOS RESPECTO A v1:
-   ─────────────────────────────────────────────────────────────────────────
-   1. markBatchNotified ahora incluye `notifiedDate` (fecha local YYYY-MM-DD)
-      en la key de deduplicación.
-
-      Key anterior: (batchId, expirationDate)
-      Key nueva:    (batchId, expirationDate, notifiedDate)
-
-      ¿Por qué? Con la key anterior, una vez que un lote era notificado,
-      quedaba marcado PARA SIEMPRE hasta que su fecha de vencimiento pasara.
-      Esto hacía que en macOS (donde el store persiste sin recargar la página)
-      solo se disparara la notificación de los lotes "nuevos" en rango,
-      ignorando los lotes que ya habían sido notificados días atrás y que
-      ahora tienen MENOS días restantes (seguían siendo urgentes).
-
-      Con la key nueva, cada lote se considera "ya notificado" solo por el
-      día en que se envió. Al día siguiente, notifiedDate cambia → la entrada
-      no matchea → se vuelve a notificar. Esto replica el comportamiento
-      de Windows/Linux donde el refresh vaciaba el store y todos los lotes
-      urgentes se notificaban en cada sesión.
-
-   2. cleanStaleNotified ahora usa la misma lógica de fecha Argentina
-      (YYYY-MM-DD del lado cliente) y además elimina entradas de días
-      anteriores (notifiedDate < hoy), limpiando el store activamente.
-
-   3. resetNotifiedForDaysChange: nueva acción que limpia notifiedBatchIds
-      cuando el usuario cambia alertDaysAhead, forzando un re-chequeo
-      completo con el nuevo rango. Sin esto, al ampliar de 2 a 7 días,
-      los lotes de días 3-7 no se notificaban hasta el día siguiente.
-   ─────────────────────────────────────────────────────────────────────────
-*/
+/*
+ *
+ * ARQUITECTURA DE DEDUPLICACIÓN (fix macOS):
+ * ─────────────────────────────────────────────────────────────────────────────
+ * `notifiedBatchIds` se usa SOLO para persistencia entre sesiones (localStorage
+ * vía redux-persist). En memoria, `useNotifications` mantiene un Set local
+ * (`localNotifiedRef`) que es la fuente de verdad para el dedup dentro de
+ * la sesión activa. Esto elimina la dependencia de timing React render ↔ ref.
+ *
+ * `resetToken`: string que cambia cada vez que se debe limpiar el dedup local.
+ * `useNotifications` lo escucha y resetea `localNotifiedRef` de forma síncrona.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
 
 const initialState = {
   enabled:          false,
@@ -42,7 +21,11 @@ const initialState = {
   alertDaysAhead:   2,
   permission:       'default',
   swRegistered:     false,
+  // Para persistencia entre sesiones (cross-session dedup)
   notifiedBatchIds: [],
+  // Token de reset: cuando cambia, useNotifications resetea localNotifiedRef.
+  // Usamos Date.now().toString() para que sea único y serializable.
+  resetToken:       '0',
   lastCheckAt:      null,
 };
 
@@ -55,14 +38,14 @@ const notificationsSlice = createSlice({
     setIntervalMinutes(state, action) { state.intervalMinutes = action.payload; },
 
     setAlertDaysAhead(state, action) {
-      state.alertDaysAhead = action.payload;
-      /* Al cambiar el rango de días limpiar las notificaciones ya enviadas
-         para que el check inmediato que sigue encuentre todos los lotes
-         dentro del nuevo rango como "no notificados aún". */
-      state.notifiedBatchIds = [];
+      state.alertDaysAhead     = action.payload;
+      state.notifiedBatchIds   = [];
+      // Cambiar el token fuerza a useNotifications a resetear localNotifiedRef
+      // de forma síncrona antes del próximo checkExpirations.
+      state.resetToken         = Date.now().toString();
     },
 
-    setPermission(state, action)      { state.permission = action.payload; },
+    setPermission(state, action) { state.permission = action.payload; },
 
     syncPermission(state) {
       if (typeof window === 'undefined' || !('Notification' in window)) {
@@ -74,11 +57,6 @@ const notificationsSlice = createSlice({
 
     setSwRegistered(state, action) { state.swRegistered = action.payload; },
 
-    /* ── markBatchNotified ──────────────────────────────────────────────────
-       Registra que el lote `batchId` fue notificado HOY.
-       La key de deduplicación es (batchId + expirationDate + notifiedDate).
-       notifiedDate = fecha local del cliente en formato YYYY-MM-DD.
-    ── */
     markBatchNotified(state, action) {
       const { batchId, expirationDate, notifiedDate } = action.payload;
       const exists = state.notifiedBatchIds.find(
@@ -92,14 +70,6 @@ const notificationsSlice = createSlice({
       }
     },
 
-    /* ── cleanStaleNotified ─────────────────────────────────────────────────
-       Elimina entradas donde:
-       - La fecha de vencimiento ya pasó (el lote ya venció → no urge notif)
-       - La fecha de notificación es anterior a hoy (entrada vieja del día anterior)
-       
-       Se usa la fecha del cliente (sin timezone offset) comparando strings
-       YYYY-MM-DD para evitar problemas con UTC vs Argentina (UTC-3).
-    ── */
     cleanStaleNotified(state) {
       const todayStr = new Date(
         Date.now() - new Date().getTimezoneOffset() * 60000
@@ -107,18 +77,14 @@ const notificationsSlice = createSlice({
 
       state.notifiedBatchIds = state.notifiedBatchIds.filter(
         (n) =>
-          n.expirationDate >= todayStr &&  // lote no vencido aún
-          n.notifiedDate   >= todayStr     // entrada de hoy (no de días anteriores)
+          n.expirationDate >= todayStr &&
+          n.notifiedDate   >= todayStr
       );
     },
 
-    /* ── resetNotifiedForDaysChange ─────────────────────────────────────────
-       Limpia todo el historial de notificaciones enviadas.
-       Usada internamente por setAlertDaysAhead (arriba) y también puede
-       llamarse manualmente si se necesita forzar un re-chequeo completo.
-    ── */
     resetNotifiedForDaysChange(state) {
       state.notifiedBatchIds = [];
+      state.resetToken       = Date.now().toString();
     },
 
     setLastCheckAt(state, action) { state.lastCheckAt = action.payload; },
@@ -129,6 +95,7 @@ const notificationsSlice = createSlice({
       state.intervalMinutes  = 30;
       state.alertDaysAhead   = 2;
       state.notifiedBatchIds = [];
+      state.resetToken       = Date.now().toString();
       state.lastCheckAt      = null;
     },
   },
@@ -156,6 +123,7 @@ export const selectNotifDaysAhead   = (s) => s.notifications.alertDaysAhead;
 export const selectNotifPermission  = (s) => s.notifications.permission;
 export const selectSwRegistered     = (s) => s.notifications.swRegistered;
 export const selectNotifiedBatchIds = (s) => s.notifications.notifiedBatchIds;
+export const selectResetToken       = (s) => s.notifications.resetToken;
 export const selectLastCheckAt      = (s) => s.notifications.lastCheckAt;
 
 export default notificationsSlice.reducer;
