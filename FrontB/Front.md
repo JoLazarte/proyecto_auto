@@ -1,138 +1,322 @@
-# PanStock-client
+## PanStock — Frontend 
 
-## Resumen
+Interfaz web para el sistema de gestión de inventario de la franquicia **Dulce Hora** . Construida en **React + Vite + Redux Toolkit + Redux Persist** . 
 
-Este entregable completa la lógica de **Productos** y **Categorías** en el frontend, registra todos los reducers en Redux (con persist), y corrige el `SecurityConfig.java` del backend.
+## Stack 
 
----
-
-## 1. Backend — `SecurityConfig.java` 
-
-### Accesos
-Todos los GET de productos, categorías y proveedores tienen `permitAll()` a `authenticated()`:
-
-```java
-// Productos
-.requestMatchers(HttpMethod.GET,    "/api/products/**").authenticated()
-.requestMatchers(HttpMethod.POST,   "/api/products/**").hasAuthority(Role.OWNER.name())
-.requestMatchers(HttpMethod.PUT,    "/api/products/**").hasAuthority(Role.OWNER.name())
-.requestMatchers(HttpMethod.DELETE, "/api/products/**").hasAuthority(Role.OWNER.name())
-
-// Categorías
-.requestMatchers(HttpMethod.GET,    "/api/categories/**").authenticated()
-.requestMatchers(HttpMethod.POST,   "/api/categories/**").hasAuthority(Role.OWNER.name())
-.requestMatchers(HttpMethod.PUT,    "/api/categories/**").hasAuthority(Role.OWNER.name())
-.requestMatchers(HttpMethod.DELETE, "/api/categories/**").hasAuthority(Role.OWNER.name())
-
-// Proveedores (también corregido — employees necesitan leer para el form de productos)
-.requestMatchers(HttpMethod.GET,    "/api/suppliers/**").authenticated()
-.requestMatchers(HttpMethod.POST,   "/api/suppliers/**").hasAuthority(Role.OWNER.name())
-.requestMatchers(HttpMethod.PUT,    "/api/suppliers/**").hasAuthority(Role.OWNER.name())
-.requestMatchers(HttpMethod.DELETE, "/api/suppliers/**").hasAuthority(Role.OWNER.name())
-```
-
-> **`application.properties` no requiere cambios** — la configuración de DB, JPA y JWT está correcta.
-
----
-
-## 2. Frontend — Archivo por archivo
-
-### `src/store/store.js` ✅ CORREGIDO
-**Problema original:** Solo registraba `authReducer`. Los slices de `categories`, `products` y `suppliers` existían pero **nunca se conectaban al store**, por lo que cualquier `useSelector` de esos slices lanzaba un error de runtime.
-
-**Corrección:** Se importan y registran los tres reducers con sus propias configuraciones de `redux-persist`:
-- `auth` → persiste `token`, `user`, `isAuthenticated`
-- `categories` → persiste `items` (la lista cargada)
-- `products` → persiste `items` y `filters`
-- `suppliers` → persiste `items`
-
-Los campos `actionStatus` y `actionError` son estado efímero de UI y se excluyen intencionalmente del persist.
-
----
-
-### `src/services/catalogService.js`
-- Manejo de errores unificado: lee `data.message` (formato de error del backend Spring) y `data.error` (formato del wrapper `ResponseData`)
-- Headers de auth incluidos en todas las llamadas
-- Todos los métodos alineados con los endpoints documentados
-
----
-
-### `src/features/catalog/categoriesSlice.js` 
-Sin cambios de lógica — el slice original estaba correcto. Se mantiene igual con documentación mejorada.
-
-### `src/features/catalog/productsSlice.js`
-Sin cambios de lógica — el slice original estaba correcto.
-
-### `src/features/catalog/suppliersSlice.js` ✅ REVISADO
-Sin cambios de lógica.
-
----
-
-### `src/pages/CategoriesPage.jsx` ✅ COMPLETADO
-La lógica de roles estaba presente pero el store no registraba el reducer, así que nunca funcionaba.
-
-Con el store corregido, la página ahora funciona completamente:
-
-| Acción | OWNER | EMPLOYEE |
-|--------|-------|----------|
-| Ver listado | ✅ | ✅ |
-| Buscar / filtrar | ✅ | ✅ |
-| Ver inactivas (checkbox) | ✅ | ✅ |
-| Botón "Nueva categoría" | ✅ visible | ❌ oculto |
-| Botones editar/desactivar por fila | ✅ visibles | ❌ ocultos |
-| Modal de formulario | ✅ se abre | ❌ no renderiza |
-| Dialog de confirmación | ✅ se abre | ❌ no renderiza |
-
----
-
-### `src/pages/ProductsPage.jsx` ✅ COMPLETADO
-Misma lógica de roles:
-
-| Acción | OWNER | EMPLOYEE |
-|--------|-------|----------|
-| Ver listado + expandir detalle | ✅ | ✅ |
-| Filtros (categoría, origen, inactivos) | ✅ | ✅ |
-| Botón "Nuevo producto" | ✅ visible | ❌ oculto |
-| Botones editar/desactivar por fila | ✅ visibles | ❌ ocultos |
-| Columna "Acciones" en el header | ✅ visible | ❌ oculta |
-| Modal de formulario | ✅ se abre | ❌ no renderiza |
-| Dialog de confirmación | ✅ se abre | ❌ no renderiza |
-
----
-
-### `src/components/catalog/CategoryForm.jsx` ✅ REVISADO
-Sin cambios de lógica — solo se llama desde CategoriesPage que ya verifica el rol OWNER.
-
-### `src/components/catalog/ProductForm.jsx` ✅ REVISADO
-- UnitTypes corregidos: `TRAY`, `BAG`, `PACK` en lugar de `PACKAGE` (según el enum Java real en `UnitType.java`)
-- Solo se llama desde ProductsPage que ya verifica el rol OWNER
-
----
-
-## 3. Cómo aplicar los cambios
-
-### Backend
-Reemplazar:
-```
-Back/panstock-api/src/main/java/com/panstock/api/controller/config/SecurityConfig.java
-```
-con el archivo en `backend-fix/SecurityConfig.java`.
-
-> **No tocar** `application.properties`.
-
-### Frontend
-Reemplazar en `FrontB/panstock-client/src/`:
-
-| Archivo entregado | Destino |
+|Stack||
 |---|---|
-| `src/store/store.js` | `src/store/store.js` |
-| `src/services/catalogService.js` | `src/services/catalogService.js` |
-| `src/features/catalog/categoriesSlice.js` | `src/features/catalog/categoriesSlice.js` |
-| `src/features/catalog/productsSlice.js` | `src/features/catalog/productsSlice.js` |
-| `src/features/catalog/suppliersSlice.js` | `src/features/catalog/suppliersSlice.js` |
-| `src/pages/CategoriesPage.jsx` | `src/pages/CategoriesPage.jsx` |
-| `src/pages/ProductsPage.jsx` | `src/pages/ProductsPage.jsx` |
-| `src/components/catalog/CategoryForm.jsx` | `src/components/catalog/CategoryForm.jsx` |
-| `src/components/catalog/ProductForm.jsx` | `src/components/catalog/ProductForm.jsx` |
+|**Capa**|**Tecnología**|
+|Framework|React 18 + Vite|
+|Estado global|Redux Toolkit|
+|Persistencia local|Redux Persist (localStorage)|
+|Routing|React Router v6|
+|Estilos|CSS-in-JS inline (styled dentro de cada<br>componente)|
+|Fuentes|Playfair Display + DM Sans (Google Fonts)|
 
-Los archivos no listados (`App.jsx`, `LoginPage.jsx`, `RegisterPage.jsx`, `DashboardPage.jsx`, `AppTopbar.jsx`, `CatalogUI.jsx`, `FormField.jsx`, `authSlice.js`, `authService.js`, `main.jsx`, etc.) **no requieren cambios**.
+
+
+## Requisitos previos 
+
+- Node.js 18 o superior 
+
+- Backend PanStock corriendo en http://localhost:8081 (o configurar VITE_API_URL) 
+
+## Instalación y ejecución 
+
+cd Front/panstock-client 
+
+npm install 
+
+npm run dev 
+
+Para apuntar a otro backend, crear un archivo .env.local: 
+
+VITE_API_URL=http://localhost:8081 
+
+## Estructura de carpetas 
+
+src/ 
+
+├── components/ 
+
+- │   ├── catalog/ 
+
+- │   │   ├── CategoryForm.jsx       # Formulario crear/editar categoría 
+
+- │   │   └── ProductForm.jsx        # Formulario crear/editar producto 
+
+- │   ├── layout/ 
+
+- │   │   └── AppTopbar.jsx          # Barra de navegación superior 
+
+- │   ├── stock/ 
+
+- │   │   ├── StockEntryForm.jsx     # Formulario de ingreso de mercadería 
+
+- │   │   └── StockSaleForm.jsx      # Formulario de venta manual 
+
+- │   └── ui/ 
+
+- │       ├── CatalogUI.jsx          # Componentes compartidos (Modal, Badge, etc.) 
+
+- │       └── FormField.jsx          # Input, Button, Alert reutilizables 
+
+├── features/ 
+
+- │   ├── auth/ 
+
+- │   │   └── authSlice.js           # Login, registro, logout, perfil 
+
+- │   ├── catalog/ 
+
+- │   │   ├── categoriesSlice.js     # CRUD categorías 
+
+- │   │   ├── productsSlice.js       # CRUD productos 
+
+- │   │   └── suppliersSlice.js      # CRUD proveedores 
+
+- │   └── stock/ 
+
+- │       ├── expirationSlice.js     # Semáforo de vencimientos 
+
+- │       └── stockSlice.js          # Stock, lotes, ingresos y ventas 
+
+## ├── pages/ 
+
+- │   ├── LoginPage.jsx 
+
+- │   ├── RegisterPage.jsx 
+
+- │   ├── DashboardPage.jsx 
+
+- │   ├── ExpirationPage.jsx 
+
+- │   ├── ProductsPage.jsx 
+
+- │   ├── CategoriesPage.jsx 
+
+- │   ├── SuppliersPage.jsx 
+
+- │   └── StockPage.jsx 
+
+## ├── services/ 
+
+- │   ├── authService.js             # Llamadas a /auth/** 
+
+- │   ├── catalogService.js          # Llamadas a /api/products, categories, suppliers 
+
+- │   └── stockService.js            # Llamadas a /api/stock/expiring, expired, batches 
+
+├── store/ 
+
+- │   └── store.js                   # Configuración Redux + persistencia 
+
+- ├── App.jsx                        # Rutas principales 
+
+- ├── main.jsx                       # Entry point 
+
+- └── index.css                      # Variables CSS globales y animaciones 
+
+## Rutas 
+
+|Rutas|||
+|---|---|---|
+|**Ruta**|**Página**|**Acceso**|
+|/login|LoginPage|Público|
+|/register|RegisterPage|Público|
+|/dashboard|DashboardPage|Autenticado|
+|/stock|StockPage|Autenticado|
+|/expiration|ExpirationPage|Autenticado|
+|/products|ProductsPage|Autenticado|
+|/categories|CategoriesPage|Autenticado|
+|/suppliers|SuppliersPage|Autenticado|
+
+
+
+Las rutas protegidas redirigen a /login si no hay sesión activa. Si el token JWT expiró, se detecta automáticamente en TokenGuard (dentro de App.jsx) y se hace logout. 
+
+## Roles y permisos en el frontend 
+
+El frontend respeta los roles devueltos por el backend al autenticarse. 
+
+|**Acción**|**OWNER**|**EMPLOYEE**|
+|---|---|---|
+|Ver stock, lotes, vencimientos|✅|✅|
+|Registrar ingreso de<br>mercadería|✅|✅|
+|Registrar venta manual|✅|✅|
+|Crear / editar / desactivar<br>productos|✅|✅|
+|Crear / editar / desactivar<br>categorías|✅|✅|
+|Crear / editar / desactivar<br>proveedores|✅|✅|
+
+
+
+|**Acción**|**OWNER**|**EMPLOYEE**|
+|---|---|---|
+|Retirar producto de la venta<br>(desde Vencimientos)|✅|✅|
+
+
+
+Los botones de acción exclusivos de OWNER simplemente no se renderizan para EMPLOYEE. La validación final de permisos siempre la hace el backend. 
+
+## Autenticación 
+
+El flujo usa JWT. Al hacer login o registro exitoso, el backend devuelve un access_token que se guarda en Redux (y persiste en localStorage vía Redux Persist). 
+
+Cada request autenticado envía el header: 
+
+Authorization: Bearer <token> 
+
+Al navegar, TokenGuard decodifica el JWT localmente y fuerza logout si está expirado. 
+
+**Usuarios de prueba** (requieren que el SQL mock esté cargado): 
+
+|**Usuario**|**Contraseña**|**Rol**|
+|---|---|---|
+|lorena|1234|OWNER|
+|gabriel|1234|OWNER|
+|martina|1234|EMPLOYEE|
+
+
+
+## Estado global (Redux) 
+
+## auth 
+
+Persiste token, user e isAuthenticated. Se limpia al hacer logout. 
+
+## categories, products, suppliers 
+
+Persisten la lista de items y los filtros activos. Se recargan desde el servidor al entrar a cada página. 
+
+## expiration 
+
+Persiste solo los contadores del semáforo (greenCount, yellowCount, redCount, 
+
+expiredCount) para mostrar el badge en la topbar sin necesidad de un fetch previo. La lista completa de items se recarga en cada visita a la página. 
+
+## stock 
+
+**No persiste** . Stock y lotes siempre se cargan frescos desde el servidor al entrar a la página. 
+
+## Módulos implementados 
+
+## Login y Registro 
+
+- Login con usuario y contraseña 
+
+- Registro en dos pasos (datos personales → usuario y rol) 
+
+- Indicador de fuerza de contraseña 
+
+- Validación de campos en cliente antes de enviar 
+
+## Dashboard 
+
+- Saludo personalizado con rol del usuario 
+
+- Tarjeta de semáforo de vencimientos con contadores en tiempo real 
+
+- Accesos directos a todos los módulos 
+
+- Información de cuenta del usuario autenticado 
+
+## Stock (/stock) 
+
+Dos acciones principales accesibles para ambos roles: 
+
+## **Registrar ingreso** (POST /api/stock/entries) 
+
+- Selector de producto activo con indicador de perecedero 
+
+- Autocompletado del proveedor por defecto del producto 
+
+- Fecha de ingreso y vencimiento (obligatoria si el producto es perecedero) 
+
+- Cantidad, tipo de almacenamiento y observaciones 
+
+- Precios opcionales (si no se envían, usa los del producto) 
+
+- Pantalla de éxito con opción de registrar otro ingreso 
+
+## **Registrar venta** (POST /api/stock/sales) 
+
+- Selector de producto activo con chips de origen, unidad y precio 
+
+- El backend aplica FEFO automáticamente (descuenta del lote más próximo a vencer 
+
+primero) 
+
+- No se venden lotes vencidos ni productos inactivos (validado en backend) 
+
+- Pantalla de éxito mostrando qué lotes fueron descontados y en qué cantidad 
+
+- Opción de registrar otra venta sin cerrar el flujo 
+
+Vista de resumen y vista de lotes con filtros por estado y búsqueda por nombre. 
+
+## Vencimientos (/expiration) 
+
+- Semáforo visual con contadores por estado: Vencido / Vence hoy / Vence pronto / En buen estado 
+
+- Filtro por estado y búsqueda por nombre de producto 
+
+- Agrupación por producto mostrando todos sus lotes 
+
+- OWNER puede retirar un producto de la venta directamente desde esta pantalla (desactiva el producto) 
+
+## Productos (/products) 
+
+- Listado con filtros por categoría, origen y estado activo/inactivo 
+
+- Panel expandible por producto con detalle completo 
+
+- OWNER: crear, editar y desactivar productos (baja lógica) 
+
+- EMPLOYEE: solo lectura 
+
+## Categorías (/categories) 
+
+- Listado con chips de color por categoría 
+
+- OWNER: crear, editar y desactivar (baja lógica) 
+
+- EMPLOYEE: solo lectura 
+
+## Proveedores (/suppliers) 
+
+- Listado con filtro por tipo (Franquicia / Mayorista / Externo) 
+
+- OWNER: crear, editar y desactivar (baja lógica) 
+
+- EMPLOYEE: solo lectura 
+
+## Patrones de diseño 
+
+**Mobile first.** Todos los layouts usan flex y grid con breakpoints en 480–780px. La topbar colapsa labels en pantallas chicas y solo muestra íconos. 
+
+**Baja lógica.** Los DELETE del backend no eliminan registros, ponen active = false. El frontend refleja esto actualizando el item en el store local sin necesidad de un re-fetch completo. 
+
+**Errores del backend.** Todos los formularios capturan el campo message de las respuestas de error y lo muestran en un banner al usuario. 
+
+**Variables CSS globales.** La paleta completa (espresso, amber, cream, etc.), espaciados, radios y sombras están definidos en index.css como variables y se usan en todos los componentes. 
+
+## Pendiente de implementar 
+
+Los siguientes módulos están previstos pero no desarrollados aún: 
+
+- Mermas (POST /api/waste-records) 
+
+- Ajustes de stock (POST /api/stock/adjustments) 
+
+- Historial de movimientos (GET /api/stock/movements) 
+
+- Promociones (/api/promotions) 
+
+- Reportes (/api/reports) 
+
+- Alertas (/api/alerts) 
+
+- Configuración del sistema (/api/settings) 
+
+
