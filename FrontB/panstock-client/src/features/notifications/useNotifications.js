@@ -16,8 +16,10 @@ import {
   setLastCheckAt,
 } from './notificationsSlice';
 
-const BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:8081';
-
+//const BASE_URL = import.meta.env.VITE_API_URL;
+const BASE_URL = import.meta.env.MODE === 'development' 
+  ? '' 
+  : import.meta.env.VITE_API_URL;
 /* ────────────────────────────────────────────────────────────────────────────
    HELPERS DE ENTORNO
    ─────────────────────────────────────────────────────────────────────────── */
