@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -26,6 +27,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional
 public class WasteRecordServiceImpl implements WasteRecordService {
+
+    // ── Zona horaria del negocio ─────────────
+    private static final ZoneId ZONE = ZoneId.of("America/Argentina/Buenos_Aires");
 
     private final InventoryBatchRepository inventoryBatchRepository;
     private final WasteRecordRepository    wasteRecordRepository;
@@ -166,6 +170,13 @@ public class WasteRecordServiceImpl implements WasteRecordService {
      *
      * Regla específica para motivo EXPIRED:
      *   - El lote DEBE tener fecha de vencimiento definida y ya pasada
+     *
+     * IMPORTANTE: se usa ZoneId "America/Argentina/Buenos_Aires" para
+     * comparar fechas, de forma consistente con el resto del backend
+     * (StockServiceImpl, AlertServiceImpl, PromotionServiceImpl, etc.).
+     * Antes se usaba LocalDate.now() sin zona horaria, lo que fallaba
+     * en producción (servidor UTC) al intentar descartar lotes vencidos
+     * desde el frontend en horario nocturno de Argentina.
      */
     private void validateWasteRequest(InventoryBatch batch, WasteRecordRequest request) {
         if (request.quantity().compareTo(BigDecimal.ZERO) <= 0) {
@@ -190,7 +201,8 @@ public class WasteRecordServiceImpl implements WasteRecordService {
                         + "Para registrar una merma por vencimiento, el lote debe tener "
                         + "fecha de vencimiento y ésta debe ser anterior o igual a la fecha actual.");
             }
-            if (batch.getExpirationDate().isAfter(LocalDate.now())) {
+        
+            if (batch.getExpirationDate().isAfter(LocalDate.now(ZONE))) {
                 throw new BadRequestException(
                         "El lote seleccionado no está vencido (vence el "
                         + batch.getExpirationDate() + "). "
