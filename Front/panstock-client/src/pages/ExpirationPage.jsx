@@ -145,8 +145,7 @@ export default function ExpirationPage() {
 
   // ── AUTO-DESCARTE ─────────────────────────────────────────────────────────
   //
-  // Regla de negocio:
-  //   - Solo lotes con daysToExpire < 0  (es decir, desde AYER hacia atrás).
+  //   - Solo lotes con daysToExpire < 0  (es decir, contando desde AYER hacia atrás).
   //   - daysToExpire === 0 (vence HOY) → NO se descarta automáticamente.
   //   - status === 'EXPIRED' implica daysToExpire < 0 en el backend.
   //
@@ -158,6 +157,8 @@ export default function ExpirationPage() {
   //     sin importar si hubo intentos previos (no bloqueamos por historia).
   //   - El backend valida: si el lote ya está DEPLETED devuelve 400 y el
   //     thunk.rejected lo ignora silenciosamente.
+  //   - try/finally garantiza que processingRef siempre se limpie,
+  //     incluso si algún dispatch falla inesperadamente.
   // ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (status !== 'succeeded') return;
@@ -180,29 +181,31 @@ export default function ExpirationPage() {
     toProcess.forEach((item) => processingRef.current.add(item.batchId));
 
     const processAll = async () => {
-      for (const item of toProcess) {
-        await dispatch(
-          autoWasteExpiredBatch({
-            token,
-            batchId:  item.batchId,
-            quantity: Number(item.currentQuantity),
-          })
+      try {
+        for (const item of toProcess) {
+          await dispatch(
+            autoWasteExpiredBatch({
+              token,
+              batchId:  item.batchId,
+              quantity: Number(item.currentQuantity),
+            })
+          );
+        }
+
+        // Refrescar semáforo: los lotes descartados (DEPLETED, qty=0)
+        // ya no aparecerán porque getExpired() filtra solo AVAILABLE con qty > 0
+        dispatch(clearExpirationState());
+        dispatch(fetchSemaphore({ token }));
+
+        const plural = toProcess.length !== 1;
+        setAutoWasteToast(
+          `✅ ${toProcess.length} lote${plural ? 's' : ''} vencido${plural ? 's' : ''} descartado${plural ? 's' : ''} automáticamente.`
         );
+        setTimeout(() => setAutoWasteToast(''), 5000);
+      } finally {
+        // Siempre limpiar el set de este ciclo, incluso si hubo errores
+        processingRef.current.clear();
       }
-
-      // Limpiar el set de este ciclo antes del refetch
-      processingRef.current.clear();
-
-      // Refrescar semáforo: los lotes descartados (DEPLETED, qty=0)
-      // ya no aparecerán porque getExpired() filtra solo AVAILABLE con qty > 0
-      dispatch(clearExpirationState());
-      dispatch(fetchSemaphore({ token }));
-
-      const plural = toProcess.length !== 1;
-      setAutoWasteToast(
-        `✅ ${toProcess.length} lote${plural ? 's' : ''} vencido${plural ? 's' : ''} descartado${plural ? 's' : ''} automáticamente.`
-      );
-      setTimeout(() => setAutoWasteToast(''), 5000);
     };
 
     processAll();
