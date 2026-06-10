@@ -42,14 +42,13 @@ public class WasteRecordServiceImpl implements WasteRecordService {
 
         validateWasteRequest(batch, request);
 
-        if (request.userId() == null) {
-            throw new BadRequestException(
-                    "Se requiere el id del usuario que registra la merma.");
+        // userId puede ser null → registro automático del sistema
+        User user = null;
+        if (request.userId() != null) {
+            user = userRepository.findById(request.userId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Usuario no encontrado con id " + request.userId()));
         }
-
-        User user = userRepository.findById(request.userId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Usuario no encontrado con id " + request.userId()));
 
         Product product       = batch.getProduct();
         BigDecimal unitCost      = batch.getUnitCost()      != null ? batch.getUnitCost()      : product.getCostPrice();
@@ -61,7 +60,7 @@ public class WasteRecordServiceImpl implements WasteRecordService {
         WasteRecord wasteRecord = new WasteRecord();
         wasteRecord.setProduct(product);
         wasteRecord.setBatch(batch);
-        wasteRecord.setCreatedBy(user);
+        wasteRecord.setCreatedBy(user);   // null si es registro automático
         wasteRecord.setQuantity(request.quantity());
         wasteRecord.setReason(request.reason());
         wasteRecord.setUnitCost(unitCost);
@@ -82,12 +81,19 @@ public class WasteRecordServiceImpl implements WasteRecordService {
         StockMovement movement = new StockMovement();
         movement.setProduct(product);
         movement.setBatch(batch);
-        movement.setUser(user);
+        movement.setUser(user);   // null si es registro automático
         movement.setMovementType(StockMovementType.WASTE);
         movement.setQuantity(request.quantity());
         movement.setRelatedWasteRecordId(saved.getId());
-        movement.setNotes("Descuento por merma. Motivo: " + request.reason()
-                + ". Registrado por: " + user.getFirstName() + " " + user.getLastName());
+
+        if (user != null) {
+            movement.setNotes("Descuento por merma. Motivo: " + request.reason()
+                    + ". Registrado por: " + user.getFirstName() + " " + user.getLastName());
+        } else {
+            movement.setNotes("Descuento por merma automática. Motivo: " + request.reason()
+                    + ". Registrado por: sistema.");
+        }
+
         stockMovementRepository.save(movement);
 
         return WasteRecordMapper.toResponse(saved);
@@ -159,11 +165,7 @@ public class WasteRecordServiceImpl implements WasteRecordService {
      *   - El lote no puede estar DEPLETED ni DISCARDED
      *
      * Regla específica para motivo EXPIRED:
-     *   - El lote DEBE tener fecha de vencimiento definida
-     *   - La fecha de vencimiento DEBE ser anterior o igual a hoy
-     *     (es decir, el lote debe estar efectivamente vencido)
-     *   - Si el lote no está vencido, se lanza BadRequestException con
-     *     mensaje claro para que el frontend lo muestre al usuario
+     *   - El lote DEBE tener fecha de vencimiento definida y ya pasada
      */
     private void validateWasteRequest(InventoryBatch batch, WasteRecordRequest request) {
         if (request.quantity().compareTo(BigDecimal.ZERO) <= 0) {
@@ -181,8 +183,6 @@ public class WasteRecordServiceImpl implements WasteRecordService {
                     "No se puede registrar merma sobre un lote sin stock disponible.");
         }
 
-        // Validación específica para motivo EXPIRED:
-        // el lote debe estar efectivamente vencido a la fecha de hoy.
         if (request.reason() == WasteReason.EXPIRED) {
             if (batch.getExpirationDate() == null) {
                 throw new BadRequestException(
