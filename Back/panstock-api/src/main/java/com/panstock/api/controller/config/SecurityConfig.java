@@ -38,66 +38,69 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(req -> req
 
+                    // ── Preflight ────────────────────────────────────────────────────
+                    .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
                     // ── Auth: public ─────────────────────────────────────────────────
                     .requestMatchers("/auth/**").permitAll()
 
                     // ── Service Worker: public ────────────────────────────────────────
                     .requestMatchers("/sw.js").permitAll()
 
-                    // ── Users ────────────────────────────────────────────────────────
+                    // ── Users ─────────────────────────────────────────────────────────
                     .requestMatchers(HttpMethod.GET, "/users/data").authenticated()
                     .requestMatchers(HttpMethod.PUT, "/users/update").authenticated()
-                    .requestMatchers("/users/**").hasAuthority(Role.OWNER.name())
+                    .requestMatchers("/users/**").hasRole(Role.OWNER.name())
 
-                    // ── Products ─────────────────────────────────────────────────────
+                    // ── Products ──────────────────────────────────────────────────────
                     .requestMatchers(HttpMethod.GET,    "/api/products/**").authenticated()
-                    .requestMatchers(HttpMethod.POST,   "/api/products/**").hasAuthority(Role.OWNER.name())
-                    .requestMatchers(HttpMethod.PUT,    "/api/products/**").hasAuthority(Role.OWNER.name())
-                    .requestMatchers(HttpMethod.DELETE, "/api/products/**").hasAuthority(Role.OWNER.name())
+                    .requestMatchers(HttpMethod.POST,   "/api/products/**").hasRole(Role.OWNER.name())
+                    .requestMatchers(HttpMethod.PUT,    "/api/products/**").hasRole(Role.OWNER.name())
+                    .requestMatchers(HttpMethod.DELETE, "/api/products/**").hasRole(Role.OWNER.name())
 
-                    // ── Categories ───────────────────────────────────────────────────
+                    // ── Categories ────────────────────────────────────────────────────
                     .requestMatchers(HttpMethod.GET,    "/api/categories/**").authenticated()
-                    .requestMatchers(HttpMethod.POST,   "/api/categories/**").hasAuthority(Role.OWNER.name())
-                    .requestMatchers(HttpMethod.PUT,    "/api/categories/**").hasAuthority(Role.OWNER.name())
-                    .requestMatchers(HttpMethod.DELETE, "/api/categories/**").hasAuthority(Role.OWNER.name())
+                    .requestMatchers(HttpMethod.POST,   "/api/categories/**").hasRole(Role.OWNER.name())
+                    .requestMatchers(HttpMethod.PUT,    "/api/categories/**").hasRole(Role.OWNER.name())
+                    .requestMatchers(HttpMethod.DELETE, "/api/categories/**").hasRole(Role.OWNER.name())
 
-                    // ── Suppliers ────────────────────────────────────────────────────
+                    // ── Suppliers ─────────────────────────────────────────────────────
                     .requestMatchers(HttpMethod.GET,    "/api/suppliers/**").authenticated()
-                    .requestMatchers(HttpMethod.POST,   "/api/suppliers/**").hasAuthority(Role.OWNER.name())
-                    .requestMatchers(HttpMethod.PUT,    "/api/suppliers/**").hasAuthority(Role.OWNER.name())
-                    .requestMatchers(HttpMethod.DELETE, "/api/suppliers/**").hasAuthority(Role.OWNER.name())
+                    .requestMatchers(HttpMethod.POST,   "/api/suppliers/**").hasRole(Role.OWNER.name())
+                    .requestMatchers(HttpMethod.PUT,    "/api/suppliers/**").hasRole(Role.OWNER.name())
+                    .requestMatchers(HttpMethod.DELETE, "/api/suppliers/**").hasRole(Role.OWNER.name())
 
-                    // ── Stock: OWNER + EMPLOYEE (entries, sales, adjustments, summary, batches, expiring, expired) ──
+                    // ── Stock: OWNER + EMPLOYEE ───────────────────────────────────────
                     .requestMatchers("/api/stock/**").authenticated()
 
-                    // ── Restock suggestions: OWNER only ──────────────────────────────
-                    .requestMatchers(HttpMethod.GET, "/api/stock/restock-suggestions").hasAuthority(Role.OWNER.name())
+                    // ── Restock suggestions: OWNER only ───────────────────────────────
+                    .requestMatchers(HttpMethod.GET, "/api/stock/restock-suggestions").hasRole(Role.OWNER.name())
 
                     // ── Waste records: OWNER + EMPLOYEE ───────────────────────────────
-                    .requestMatchers("/api/waste-records/**").authenticated()
+                    .requestMatchers(HttpMethod.GET,  "/api/waste-records").authenticated()
+                    .requestMatchers(HttpMethod.GET,  "/api/waste-records/**").authenticated()
+                    .requestMatchers(HttpMethod.POST, "/api/waste-records").authenticated()
 
-                    // ── Alerts: OWNER + EMPLOYEE ─────────────────────────────────────
+                    // ── Alerts: OWNER + EMPLOYEE ──────────────────────────────────────
                     .requestMatchers("/api/alerts/**").authenticated()
 
-                    // ── Dashboard: OWNER + EMPLOYEE ──────────────────────────────────
+                    // ── Dashboard: OWNER + EMPLOYEE ───────────────────────────────────
                     .requestMatchers("/api/dashboard/**").authenticated()
 
                     // ── Promotions ────────────────────────────────────────────────────
-                    // GET /api/promotions y GET /api/promotions/active → OWNER + EMPLOYEE
-                    // (los empleados necesitan ver las promociones activas)
-                    .requestMatchers(HttpMethod.GET, "/api/promotions/suggestions").hasAuthority(Role.OWNER.name())
+                    .requestMatchers(HttpMethod.GET, "/api/promotions/suggestions").hasRole(Role.OWNER.name())
                     .requestMatchers(HttpMethod.GET, "/api/promotions").authenticated()
                     .requestMatchers(HttpMethod.GET, "/api/promotions/active").authenticated()
 
                     // ── Reports: OWNER only ───────────────────────────────────────────
-                    .requestMatchers("/api/reports/**").hasAuthority(Role.OWNER.name())
+                    .requestMatchers("/api/reports/**").hasRole(Role.OWNER.name())
 
-                    // ── Settings: OWNER only ──────────────────────────────────────────
-                    .requestMatchers("/api/settings/**").hasAuthority(Role.OWNER.name())
+                    // ── Settings: OWNER only ───────────────────────────────────────────
+                    .requestMatchers("/api/settings/**").hasRole(Role.OWNER.name())
 
                     .requestMatchers("/actuator/**").permitAll()
 
-                    // ── Anything else: authenticated ──────────────────────────────────
+                    // ── Anything else: authenticated ───────────────────────────────────
                     .anyRequest().authenticated()
             )
             .sessionManagement(session -> session.sessionCreationPolicy(STATELESS))
@@ -110,6 +113,7 @@ public class SecurityConfig {
     @Bean
     public UrlBasedCorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration corsConfig = new CorsConfiguration();
+        
         corsConfig.setAllowedOrigins(List.of("*"));
         corsConfig.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         corsConfig.setAllowCredentials(false);

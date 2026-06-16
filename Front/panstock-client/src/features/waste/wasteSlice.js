@@ -28,8 +28,19 @@ const handleResponse = async (res) => {
 
 export const fetchWasteRecords = createAsyncThunk(
   'waste/fetchAll',
-  async ({ token, params = {} } = {}, { rejectWithValue }) => {
+  async ({ token, params = {} } = {}, { getState, rejectWithValue }) => { //  destructurado getState
     try {
+      let effectiveToken = token;
+      if (!effectiveToken) {
+        const state = getState();
+        effectiveToken = state.auth?.token || state.auth?.access_token; 
+        console.warn('[wasteSlice] Token no llegó en argumento, extrayendo de Redux:', effectiveToken?.substring(0, 20) + '...');
+      }
+      
+      if (!effectiveToken) {
+        throw new Error('No hay token de autenticación. Por favor, inicia sesión.');
+      }
+
       const q = new URLSearchParams();
       if (params.from)        q.set('from',        params.from);
       if (params.to)          q.set('to',          params.to);
@@ -38,8 +49,9 @@ export const fetchWasteRecords = createAsyncThunk(
       if (params.reason)      q.set('reason',      params.reason);
       if (params.createdById) q.set('createdById', String(params.createdById));
       const qs = q.toString();
+      
       return await fetch(`${BASE_URL}/api/waste-records${qs ? `?${qs}` : ''}`, {
-        headers: authHeaders(token),
+        headers: authHeaders(effectiveToken), // usa effectiveToken para evitar 403
       }).then(handleResponse);
     } catch (e) {
       return rejectWithValue(e.message);
@@ -49,11 +61,21 @@ export const fetchWasteRecords = createAsyncThunk(
 
 export const createWasteRecord = createAsyncThunk(
   'waste/create',
-  async ({ token, data }, { rejectWithValue }) => {
+  async ({ token, data }, { getState, rejectWithValue }) => { //destructurado getState
     try {
+      let effectiveToken = token;
+      if (!effectiveToken) {
+        const state = getState();
+        effectiveToken = state.auth?.token || state.auth?.access_token;
+      }
+      
+      if (!effectiveToken) {
+        throw new Error('No hay token de autenticación. Por favor, inicia sesión.');
+      }
+
       return await fetch(`${BASE_URL}/api/waste-records`, {
         method: 'POST',
-        headers: authHeaders(token),
+        headers: authHeaders(effectiveToken),
         body: JSON.stringify(data),
       }).then(handleResponse);
     } catch (e) {
@@ -62,19 +84,20 @@ export const createWasteRecord = createAsyncThunk(
   }
 );
 
-/**
- * autoWasteExpiredBatch
- *
- * Registra automáticamente la merma de UN lote vencido (daysToExpire < 0).
- * userId = null → backend lo acepta como "sistema automático".
- *
- * Tras el éxito, dispara recordAutoWaste para acumular el lote en el
- * slice de notificación del día y mostrar el modal de confirmación.
- */
 export const autoWasteExpiredBatch = createAsyncThunk(
   'waste/autoWasteExpiredBatch',
-  async ({ token, batchId, quantity, productName }, { dispatch, rejectWithValue }) => {
+  async ({ token, batchId, quantity, productName }, { getState, dispatch, rejectWithValue }) => { //destructurado getState
     try {
+      let effectiveToken = token;
+      if (!effectiveToken) {
+        const state = getState();
+        effectiveToken = state.auth?.token || state.auth?.access_token;
+      }
+
+      if (!effectiveToken) {
+        throw new Error('No hay token de autenticación. Por favor, inicia sesión.');
+      }
+
       const data = {
         batchId,
         userId:   null,
@@ -82,15 +105,22 @@ export const autoWasteExpiredBatch = createAsyncThunk(
         reason:   'EXPIRED',
         notes:    'Descarte automático de lote vencido (sistema).',
       };
-      const result = await fetch(`${BASE_URL}/api/waste-records`, {
-        method: 'POST',
-        headers: authHeaders(token),
-        body: JSON.stringify(data),
-      }).then(handleResponse);
 
-      // ── Notificar al slice del modal ──────────────────────────────────
-      // Se dispara aquí (no en extraReducers) para tener acceso al payload
-      // enriquecido (productName viene del thunk arg, wasteRecordId del result).
+      const response = await fetch(`${BASE_URL}/api/waste-records`, {
+        method: 'POST',
+        headers: authHeaders(effectiveToken),
+        body: JSON.stringify(data),
+      });
+
+      if (response.status === 403) {
+        throw new Error(
+          'Acceso denegado (403). Verifica tu sesión o permisos. ' +
+          'Si el problema persiste, intenta cerrar sesión y volver a iniciar.'
+        );
+      }
+
+      const result = await handleResponse(response);
+
       if (result) {
         dispatch(recordAutoWaste({
           batchId,
@@ -111,6 +141,10 @@ export const fetchUsers = createAsyncThunk(
   'waste/fetchUsers',
   async ({ token }, { rejectWithValue }) => {
     try {
+      if (!token) {
+        throw new Error('No hay token de autenticación.');
+      }
+
       return await fetch(`${BASE_URL}/users`, {
         headers: authHeaders(token),
       }).then(handleResponse);
@@ -132,16 +166,17 @@ const initialFilters = {
 };
 
 const initialState = {
-  items:        [],
-  listStatus:   'idle',
-  listError:    null,
-  actionStatus: 'idle',
-  actionError:  null,
-  lastCreated:  null,
-  users:        [],
-  usersStatus:  'idle',
-  activeFilters: initialFilters,
+  items:            [],
+  listStatus:       'idle',
+  listError:        null,
+  actionStatus:     'idle',
+  actionError:      null,
+  lastCreated:      null,
+  users:            [],
+  usersStatus:      'idle',
+  activeFilters:    initialFilters,
   autoWastePending: [],
+  lastFetch:        null,
 };
 
 // ─── Slice ────────────────────────────────────────────────────────────────────
@@ -172,7 +207,7 @@ const wasteSlice = createSlice({
     // ── fetchWasteRecords ──
     builder
       .addCase(fetchWasteRecords.pending,   (s) => { s.listStatus = 'loading'; s.listError = null; })
-      .addCase(fetchWasteRecords.fulfilled, (s, a) => { s.listStatus = 'succeeded'; s.items = a.payload ?? []; })
+      .addCase(fetchWasteRecords.fulfilled, (s, a) => { s.listStatus = 'succeeded'; s.items = a.payload ?? []; s.lastFetch = Date.now(); })
       .addCase(fetchWasteRecords.rejected,  (s, a) => { s.listStatus = 'failed'; s.listError = a.payload; });
 
     // ── createWasteRecord (manual) ──
@@ -226,14 +261,16 @@ export const {
 
 // ─── Selectors ────────────────────────────────────────────────────────────────
 
-export const selectWasteRecords     = (s) => s.waste.items;
-export const selectWasteListStatus  = (s) => s.waste.listStatus;
-export const selectWasteListError   = (s) => s.waste.listError;
-export const selectWasteFilters     = (s) => s.waste.activeFilters;
-export const selectWasteUsers       = (s) => s.waste.users;
-export const selectWasteUsersStatus = (s) => s.waste.usersStatus;
-export const selectAutoWastePending = (s) => s.waste.autoWastePending;
-export const selectWasteAction      = (s) => ({
+export const selectWasteRecords      = (s) => s.waste.items;
+export const selectWasteListStatus   = (s) => s.waste.listStatus;
+export const selectWasteListError    = (s) => s.waste.listError;
+export const selectWasteFilters      = (s) => s.waste.activeFilters;
+export const selectWasteUsers        = (s) => s.waste.users;
+export const selectWasteUsersStatus  = (s) => s.waste.usersStatus;
+export const selectAutoWastePending  = (s) => s.waste.autoWastePending;
+export const selectWasteActionStatus = (s) => s.waste.actionStatus;
+export const selectWasteActionError  = (s) => s.waste.actionError;
+export const selectWasteAction       = (s) => ({
   status:      s.waste.actionStatus,
   error:       s.waste.actionError,
   lastCreated: s.waste.lastCreated,
