@@ -29,5 +29,5 @@ target/
 .vscode/
 
 ## Data Base ##
-./main/resources/application.properties
-./main/resources/application-prod.properties
+!**/src/main/resources/application.properties
+!**/src/main/resources/application-prod.properties
