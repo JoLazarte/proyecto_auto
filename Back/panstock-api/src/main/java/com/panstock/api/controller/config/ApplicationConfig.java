@@ -12,14 +12,14 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import com.panstock.api.repository.jpa.UserJpaRepository;
+import com.panstock.api.repository.UserRepository;
 
 @Configuration
 public class ApplicationConfig {
 
-    private final UserJpaRepository userRepository;
+    private final UserRepository userRepository;
 
-    public ApplicationConfig(@Lazy UserJpaRepository userRepository) {
+    public ApplicationConfig(@Lazy UserRepository userRepository) {
         this.userRepository = userRepository;
     }
 

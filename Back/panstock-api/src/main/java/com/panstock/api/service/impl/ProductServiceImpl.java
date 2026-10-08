@@ -48,13 +48,13 @@ public class ProductServiceImpl implements ProductService {
         List<Product> products;
 
         if (origin != null) {
-            products = productRepository.findActiveByOrigin(origin);
+            products = productRepository.findByOriginAndActiveTrueOrderByNameAsc(origin);
         } else if (categoryId != null) {
-            products = productRepository.findActiveByCategoryId(categoryId);
+            products = productRepository.findByCategoryIdAndActiveTrueOrderByNameAsc(categoryId);
         } else if (Boolean.TRUE.equals(activeOnly)) {
-            products = productRepository.findActive();
+            products = productRepository.findByActiveTrueOrderByNameAsc();
         } else {
-            products = productRepository.findAll();
+            products = productRepository.findAllByOrderByNameAsc();
         }
 
         return products.stream()

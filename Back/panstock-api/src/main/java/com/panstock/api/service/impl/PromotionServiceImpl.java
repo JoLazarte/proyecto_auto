@@ -114,7 +114,7 @@ public class PromotionServiceImpl implements PromotionService {
     @Override
     @Transactional(readOnly = true)
     public List<PromotionResponse> findAll() {
-        return promotionRepository.findAll()
+        return promotionRepository.findAllByOrderByStartDateDesc()
                 .stream()
                 .map(PromotionMapper::toResponse)
                 .toList();

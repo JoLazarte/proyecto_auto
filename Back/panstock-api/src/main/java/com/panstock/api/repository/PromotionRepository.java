@@ -1,19 +1,43 @@
 package com.panstock.api.repository;
 
 import com.panstock.api.entity.Promotion;
+import com.panstock.api.enums.PromotionStatus;
+import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
-public interface PromotionRepository {
+public interface PromotionRepository extends JpaRepository<Promotion, Long> {
 
-    Promotion save(Promotion promotion);
+    List<Promotion> findAllByOrderByStartDateDesc();
 
-    Optional<Promotion> findById(Long id);
+    List<Promotion> findByStatusAndEndDateGreaterThanEqualOrderByEndDateAsc(
+            PromotionStatus status,
+            LocalDateTime now
+    );
 
-    List<Promotion> findAll();
+    // batch es @ManyToOne, se navega con batch_Id
+    boolean existsByBatch_IdAndStatusAndEndDateGreaterThanEqual(
+            Long batchId,
+            PromotionStatus status,
+            LocalDateTime now
+    );
 
-    List<Promotion> findActive();
+    // ── Atajos de dominio ────────────────────────────────────────────────────
 
-    boolean existsActiveByBatchId(Long batchId);
+    /** Promociones activas que todavía no vencieron. */
+    default List<Promotion> findActive() {
+        return findByStatusAndEndDateGreaterThanEqualOrderByEndDateAsc(
+                PromotionStatus.ACTIVE,
+                LocalDateTime.now()
+        );
+    }
+
+    default boolean existsActiveByBatchId(Long batchId) {
+        return existsByBatch_IdAndStatusAndEndDateGreaterThanEqual(
+                batchId,
+                PromotionStatus.ACTIVE,
+                LocalDateTime.now()
+        );
+    }
 }

@@ -11,7 +11,7 @@ import com.panstock.api.controller.auth.RegisterRequest;
 import com.panstock.api.controller.config.JwtService;
 import com.panstock.api.entity.User;
 import com.panstock.api.exception.UserException;
-import com.panstock.api.repository.jpa.UserJpaRepository;
+import com.panstock.api.repository.UserRepository;
 
 import jakarta.security.auth.message.AuthException;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +20,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AuthenticationService {
 
-    private final UserJpaRepository userRepository;
+    private final UserRepository userRepository;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
     private final UserService userService;

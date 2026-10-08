@@ -1,31 +1,29 @@
 package com.panstock.api.repository;
 
 import com.panstock.api.entity.WasteRecord;
+import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
-public interface WasteRecordRepository {
-
-    WasteRecord save(WasteRecord wasteRecord);
-
-    Optional<WasteRecord> findById(Long id);
-
-    /**
-     * Devuelve todos los registros de merma, ordenados por fecha descendente.
-     */
-    List<WasteRecord> findAll();
+/**
+ * {@code search(...)} viene del fragment {@link WasteRecordRepositoryCustom}
+ * (implementado en {@code WasteRecordRepositoryCustomImpl}).
+ */
+public interface WasteRecordRepository
+        extends JpaRepository<WasteRecord, Long>, WasteRecordRepositoryCustom {
 
     /**
-     * Devuelve registros de merma dentro de un rango de fechas (para reportes).
+     * Todos los registros ordenados por fecha descendente (más recientes primero).
      */
-    List<WasteRecord> findByWasteDateBetween(LocalDateTime from, LocalDateTime to);
+    List<WasteRecord> findAllByOrderByWasteDateDesc();
 
     /**
-     * Búsqueda con todos los filtros opcionales: rango de fechas + createdById.
-     * Si from/to son null no se aplica filtro de fecha.
-     * Si createdById es null no se aplica filtro de usuario.
+     * Registros en un rango de fechas, ordenados por fecha descendente.
+     * Usado para filtros de período y para reportes.
      */
-    List<WasteRecord> search(LocalDateTime from, LocalDateTime to, Long createdById);
+    List<WasteRecord> findByWasteDateBetweenOrderByWasteDateDesc(
+            LocalDateTime from,
+            LocalDateTime to
+    );
 }

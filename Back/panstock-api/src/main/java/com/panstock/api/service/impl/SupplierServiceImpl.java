@@ -39,11 +39,11 @@ public class SupplierServiceImpl implements SupplierService {
         List<Supplier> suppliers;
 
         if (supplierType != null) {
-            suppliers = supplierRepository.findActiveBySupplierType(supplierType);
+            suppliers = supplierRepository.findByActiveTrueAndSupplierTypeOrderByNameAsc(supplierType);
         } else if (Boolean.TRUE.equals(activeOnly)) {
-            suppliers = supplierRepository.findActive();
+            suppliers = supplierRepository.findByActiveTrueOrderByNameAsc();
         } else {
-            suppliers = supplierRepository.findAll();
+            suppliers = supplierRepository.findAllByOrderByNameAsc();
         }
 
         return suppliers.stream()

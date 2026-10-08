@@ -13,7 +13,7 @@ import com.panstock.api.dto.UserDTO;
 import com.panstock.api.entity.User;
 import com.panstock.api.enums.Role;
 import com.panstock.api.exception.UserException;
-import com.panstock.api.repository.jpa.UserJpaRepository;
+import com.panstock.api.repository.UserRepository;
 import com.panstock.api.service.UserService;
 
 import jakarta.transaction.Transactional;
@@ -22,7 +22,7 @@ import jakarta.transaction.Transactional;
 public class UserServiceImpl implements UserService {
 
     @Autowired
-    private UserJpaRepository userRepository;
+    private UserRepository userRepository;
     
     @Autowired
     private PasswordEncoder passwordEncoder;

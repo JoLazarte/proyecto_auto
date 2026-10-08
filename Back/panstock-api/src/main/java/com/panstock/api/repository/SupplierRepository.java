@@ -2,21 +2,17 @@ package com.panstock.api.repository;
 
 import com.panstock.api.entity.Supplier;
 import com.panstock.api.enums.SupplierType;
+import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
-import java.util.Optional;
 
-public interface SupplierRepository {
+public interface SupplierRepository extends JpaRepository<Supplier, Long> {
 
-    Supplier save(Supplier supplier);
+    List<Supplier> findAllByOrderByNameAsc();
 
-    Optional<Supplier> findById(Long id);
+    List<Supplier> findByActiveTrueOrderByNameAsc();
 
-    List<Supplier> findAll();
-
-    List<Supplier> findActive();
-
-    List<Supplier> findActiveBySupplierType(SupplierType supplierType);
+    List<Supplier> findByActiveTrueAndSupplierTypeOrderByNameAsc(SupplierType supplierType);
 
     boolean existsByNameIgnoreCase(String name);
 

@@ -1,8 +1,6 @@
-package com.panstock.api.repository.impl;
+package com.panstock.api.repository;
 
 import com.panstock.api.entity.WasteRecord;
-import com.panstock.api.repository.WasteRecordRepository;
-import com.panstock.api.repository.jpa.WasteRecordJpaRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.criteria.CriteriaBuilder;
@@ -12,42 +10,20 @@ import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
-@Repository
-@RequiredArgsConstructor
-public class WasteRecordRepositoryImpl implements WasteRecordRepository {
-
-    private final WasteRecordJpaRepository wasteRecordJpaRepository;
+/**
+ * Implementación del fragment {@link WasteRecordRepositoryCustom}.
+ * Spring Data la detecta sola por el sufijo {@code Impl} y la combina con
+ * {@link WasteRecordRepository}.
+ */
+public class WasteRecordRepositoryCustomImpl implements WasteRecordRepositoryCustom {
 
     @PersistenceContext
     private EntityManager entityManager;
-
-    @Override
-    public WasteRecord save(WasteRecord wasteRecord) {
-        return wasteRecordJpaRepository.save(wasteRecord);
-    }
-
-    @Override
-    public Optional<WasteRecord> findById(Long id) {
-        return wasteRecordJpaRepository.findById(id);
-    }
-
-    @Override
-    public List<WasteRecord> findAll() {
-        return wasteRecordJpaRepository.findAllByOrderByWasteDateDesc();
-    }
-
-    @Override
-    public List<WasteRecord> findByWasteDateBetween(LocalDateTime from, LocalDateTime to) {
-        return wasteRecordJpaRepository.findByWasteDateBetweenOrderByWasteDateDesc(from, to);
-    }
 
     @Override
     public List<WasteRecord> search(LocalDateTime from, LocalDateTime to, Long createdById) {

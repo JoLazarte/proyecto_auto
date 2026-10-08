@@ -177,7 +177,7 @@ public class ReportServiceImpl implements ReportService {
         }
 
         return grouped.values().stream()
-                .map(SalesByProductAccumulator::toResponse)
+                .<SalesByProductResponse>map(SalesByProductAccumulator::toResponse)
                 .sorted(Comparator.comparing(SalesByProductResponse::totalRevenue).reversed())
                 .toList();
     }
@@ -199,7 +199,7 @@ public class ReportServiceImpl implements ReportService {
         }
 
         return grouped.values().stream()
-                .map(SalesByCategoryAccumulator::toResponse)
+                .<SalesByCategoryResponse>map(SalesByCategoryAccumulator::toResponse)
                 .sorted(Comparator.comparing(SalesByCategoryResponse::totalRevenue).reversed())
                 .toList();
     }
@@ -293,7 +293,7 @@ public class ReportServiceImpl implements ReportService {
         }
 
         return grouped.values().stream()
-                .map(BalanceByProductAccumulator::toResponse)
+                .<StockBalanceByProductResponse>map(BalanceByProductAccumulator::toResponse)
                 .filter(r -> r.totalEntered().compareTo(BigDecimal.ZERO) > 0)
                 .sorted(Comparator.comparing(StockBalanceByProductResponse::totalEntered).reversed())
                 .toList();
@@ -304,7 +304,7 @@ public class ReportServiceImpl implements ReportService {
     // ══════════════════════════════════════════════════════════════════════════
 
     private List<WasteRecord> findWasteRecords(DateRange range) {
-        return wasteRecordRepository.findByWasteDateBetween(range.fromDateTime(), range.toDateTime());
+        return wasteRecordRepository.findByWasteDateBetweenOrderByWasteDateDesc(range.fromDateTime(), range.toDateTime());
     }
 
     private List<StockMovement> findSaleMovements(DateRange range) {

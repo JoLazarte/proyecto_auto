@@ -48,7 +48,7 @@ public class AlertServiceImpl implements AlertService {
     @Override
     @Transactional(readOnly = true)
     public List<AlertResponse> findAll() {
-        return alertRepository.findAll()
+        return alertRepository.findAllByOrderByCreatedAtDesc()
                 .stream()
                 .map(AlertMapper::toResponse)
                 .toList();
@@ -150,7 +150,7 @@ public class AlertServiceImpl implements AlertService {
     private List<Alert> generateLowStockAlerts() {
         List<Alert> createdAlerts = new java.util.ArrayList<>();
 
-        List<Product>        activeProducts   = productRepository.findActive();
+        List<Product>        activeProducts   = productRepository.findByActiveTrueOrderByNameAsc();
         List<InventoryBatch> availableBatches = inventoryBatchRepository.findAvailableWithStock();
 
         Map<Long, BigDecimal> stockByProduct = new LinkedHashMap<>();

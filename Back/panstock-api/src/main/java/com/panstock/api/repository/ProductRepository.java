@@ -2,23 +2,19 @@ package com.panstock.api.repository;
 
 import com.panstock.api.entity.Product;
 import com.panstock.api.enums.ProductOrigin;
+import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
-import java.util.Optional;
 
-public interface ProductRepository {
+public interface ProductRepository extends JpaRepository<Product, Long> {
 
-    Product save(Product product);
+    List<Product> findAllByOrderByNameAsc();
 
-    Optional<Product> findById(Long id);
+    List<Product> findByActiveTrueOrderByNameAsc();
 
-    List<Product> findAll();
+    List<Product> findByOriginAndActiveTrueOrderByNameAsc(ProductOrigin origin);
 
-    List<Product> findActive();
-
-    List<Product> findActiveByOrigin(ProductOrigin origin);
-
-    List<Product> findActiveByCategoryId(Long categoryId);
+    List<Product> findByCategoryIdAndActiveTrueOrderByNameAsc(Long categoryId);
 
     boolean existsByNameIgnoreCase(String name);
 

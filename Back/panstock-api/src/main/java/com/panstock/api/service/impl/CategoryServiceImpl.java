@@ -36,8 +36,8 @@ public class CategoryServiceImpl implements CategoryService {
     @Transactional(readOnly = true)
     public List<CategoryResponse> findAll(Boolean activeOnly) {
         List<ProductCategory> categories = Boolean.TRUE.equals(activeOnly)
-                ? productCategoryRepository.findActive()
-                : productCategoryRepository.findAll();
+                ? productCategoryRepository.findByActiveTrueOrderByNameAsc()
+                : productCategoryRepository.findAllByOrderByNameAsc();
 
         return categories.stream()
                 .map(CategoryMapper::toResponse)

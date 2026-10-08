@@ -71,7 +71,7 @@ public class RestockServiceImpl implements RestockService {
         }
 
         // 3. Find all active products with a defined minimumStock
-        List<Product> activeProducts = productRepository.findActive();
+        List<Product> activeProducts = productRepository.findByActiveTrueOrderByNameAsc();
 
         List<RestockSuggestionResponse> suggestions = new ArrayList<>();
 

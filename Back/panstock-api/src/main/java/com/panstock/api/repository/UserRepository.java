@@ -1,4 +1,4 @@
-package com.panstock.api.repository.jpa;
+package com.panstock.api.repository;
 
 import com.panstock.api.entity.User;
 import com.panstock.api.enums.Role;
@@ -8,7 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import java.util.List;
 import java.util.Optional;
 
-public interface UserJpaRepository extends JpaRepository<User, Long> {
+public interface UserRepository extends JpaRepository<User, Long> {
 
     List<User> findAllByOrderByLastNameAscFirstNameAsc();
 

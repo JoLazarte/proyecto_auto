@@ -1,19 +1,15 @@
 package com.panstock.api.repository;
 
 import com.panstock.api.entity.ProductCategory;
+import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
-import java.util.Optional;
 
-public interface ProductCategoryRepository {
+public interface ProductCategoryRepository extends JpaRepository<ProductCategory, Long> {
 
-    ProductCategory save(ProductCategory category);
+    List<ProductCategory> findAllByOrderByNameAsc();
 
-    Optional<ProductCategory> findById(Long id);
-
-    List<ProductCategory> findAll();
-
-    List<ProductCategory> findActive();
+    List<ProductCategory> findByActiveTrueOrderByNameAsc();
 
     boolean existsByNameIgnoreCase(String name);
 
