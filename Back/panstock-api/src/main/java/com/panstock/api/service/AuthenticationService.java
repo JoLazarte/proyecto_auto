@@ -1,6 +1,5 @@
 package com.panstock.api.service;
 
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Service;
@@ -13,9 +12,10 @@ import com.panstock.api.entity.User;
 import com.panstock.api.exception.UserException;
 import com.panstock.api.repository.UserRepository;
 
-import jakarta.security.auth.message.AuthException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthenticationService {
@@ -25,54 +25,37 @@ public class AuthenticationService {
     private final AuthenticationManager authenticationManager;
     private final UserService userService;
 
-    public AuthenticationResponse register(RegisterRequest request) throws Exception {
-        try {
-            User user = userService.createUser(request);
-            String jwtToken = jwtService.generateToken(user);
-            return AuthenticationResponse.builder()
-                    .accessToken(jwtToken)
-                    .userId(user.getId())           // ← incluir el id
-                    .username(user.getUsername())
-                    .email(user.getEmail())
-                    .role(user.getRole())
-                    .firstName(user.getFirstName())
-                    .lastName(user.getLastName())
-                    .build();
-        } catch (UserException error) {
-            throw new UserException(error.getMessage());
-        } catch (Exception error) {
-            throw new Exception("[AuthenticationService.register] -> " + error.getMessage());
-        }
+    public AuthenticationResponse register(RegisterRequest request) {
+        User user = userService.createUser(request);
+        log.info("Usuario registrado: {} (rol {})", user.getUsername(), user.getRole());
+        return buildResponse(user);
     }
 
-    public AuthenticationResponse authenticate(AuthenticationRequest request) throws Exception {
-        try {
-            authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(
-                            request.getUsername(),
-                            request.getPassword()));
+    public AuthenticationResponse authenticate(AuthenticationRequest request) {
+        // Si las credenciales son inválidas lanza AuthenticationException,
+        // que GlobalExceptionHandler convierte en un 401.
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        request.getUsername(),
+                        request.getPassword()));
 
-            User user = userRepository.findByUsername(request.getUsername())
-                    .orElseThrow(() -> new UserException(
-                            "El usuario " + request.getUsername() + " no existe."));
+        User user = userRepository.findByUsername(request.getUsername())
+                .orElseThrow(() -> new UserException(
+                        "El usuario " + request.getUsername() + " no existe."));
 
-            String jwtToken = jwtService.generateToken(user);
-            return AuthenticationResponse.builder()
-                    .accessToken(jwtToken)
-                    .userId(user.getId())           // ← incluir el id
-                    .username(user.getUsername())
-                    .email(user.getEmail())
-                    .role(user.getRole())
-                    .firstName(user.getFirstName())
-                    .lastName(user.getLastName())
-                    .build();
-        } catch (AuthenticationException error) {
-            System.out.printf("[AuthenticationService.authenticate] -> %s", error.getMessage());
-            throw new AuthException("Usuario o contraseña incorrecto.");
-        } catch (UserException error) {
-            throw new UserException(error.getMessage());
-        } catch (Exception error) {
-            throw new Exception("[AuthenticationService.authenticate] -> " + error.getMessage());
-        }
+        log.info("Inicio de sesión: {}", user.getUsername());
+        return buildResponse(user);
+    }
+
+    private AuthenticationResponse buildResponse(User user) {
+        return AuthenticationResponse.builder()
+                .accessToken(jwtService.generateToken(user))
+                .userId(user.getId())
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .role(user.getRole())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .build();
     }
 }

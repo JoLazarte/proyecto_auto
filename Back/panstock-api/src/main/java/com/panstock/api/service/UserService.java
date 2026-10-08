@@ -14,20 +14,20 @@ import jakarta.transaction.Transactional;
 public interface UserService {
 
     @Transactional
-    public User createUser(RegisterRequest request) throws Exception;
+    public User createUser(RegisterRequest request);
 
-    public User getUserByUsername(String username) throws Exception;
+    public User getUserByUsername(String username);
 
-    public Page<User> getUsers(PageRequest pageRequest) throws Exception;
+    public Page<User> getUsers(PageRequest pageRequest);
 
     /**
      * Actualiza firstName, lastName, email y opcionalmente password
      * del usuario autenticado (el propio usuario sobre sí mismo).
      * No permite cambiar role ni enabled.
      */
-    User updateUser(User authenticatedUser, UserDTO updates) throws Exception;
-    
-    public Optional<User> getUserById(Long userId)throws Exception;
+    User updateUser(User authenticatedUser, UserDTO updates);
+
+    public Optional<User> getUserById(Long userId);
 
     /**
      * Deshabilita un usuario con rol EMPLOYEE.
@@ -38,6 +38,6 @@ public interface UserService {
      * @param targetUserId   el ID del usuario a deshabilitar
      */
     @Transactional
-    void disableEmployee(User requestingUser, Long targetUserId) throws Exception;
+    void disableEmployee(User requestingUser, Long targetUserId);
 
 }

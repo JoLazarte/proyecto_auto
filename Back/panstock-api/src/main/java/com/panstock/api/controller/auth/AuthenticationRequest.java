@@ -1,6 +1,6 @@
 package com.panstock.api.controller.auth;
 
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -11,8 +11,9 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class AuthenticationRequest {
-    @NotNull
+    @NotBlank(message = "El usuario es obligatorio.")
     private String username;
-    @NotNull
-    String password;
+
+    @NotBlank(message = "La contraseña es obligatoria.")
+    private String password;
 }

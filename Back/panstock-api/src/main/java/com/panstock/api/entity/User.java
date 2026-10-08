@@ -1,5 +1,7 @@
 package com.panstock.api.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -48,6 +50,7 @@ public class User extends AuditableEntity implements UserDetails {
     @Column(nullable = false, unique = true, length = 150)
     private String email;
 
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     @Column(nullable = false, length = 255)
     private String password;
 

@@ -47,6 +47,10 @@ public class SecurityConfig {
                     // ── Service Worker: public ────────────────────────────────────────
                     .requestMatchers("/sw.js").permitAll()
 
+                    // ── Página de error de Spring Boot: pública, para que un 500 o un 404
+                    //    llegue al cliente como tal y no como 401/403 ──────────────────
+                    .requestMatchers("/error").permitAll()
+
                     // ── Users ─────────────────────────────────────────────────────────
                     .requestMatchers(HttpMethod.GET, "/users/data").authenticated()
                     .requestMatchers(HttpMethod.PUT, "/users/update").authenticated()

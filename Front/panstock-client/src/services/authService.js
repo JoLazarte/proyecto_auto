@@ -9,8 +9,8 @@ const handleResponse = async (response) => {
   const data = await response.json();
   
   if (!response.ok) {
-    // Backend wraps errors in { ok: false, error: "message" }
-    const message = data?.error || data?.message || `Error ${response.status}`;
+    // Errores del backend: { timestamp, status, error, message }. El texto útil está en "message".
+    const message = data?.message || data?.error || `Error ${response.status}`;
     throw new Error(message);
   }
   

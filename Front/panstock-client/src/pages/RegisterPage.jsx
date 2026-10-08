@@ -164,7 +164,7 @@ export default function RegisterPage() {
     if (!form.username.trim()) errs.username = 'El usuario es obligatorio';
     else if (form.username.includes(' ')) errs.username = 'El usuario no puede tener espacios';
     if (!form.password)        errs.password = 'La contraseña es obligatoria';
-    else if (form.password.length < 4) errs.password = 'Mínimo 4 caracteres';
+    else if (form.password.length < 8) errs.password = 'Mínimo 8 caracteres';
     if (!form.confirm)         errs.confirm  = 'Confirmá la contraseña';
     else if (form.confirm !== form.password) errs.confirm = 'Las contraseñas no coinciden';
     return errs;
