@@ -30,3 +30,4 @@ target/
 
 ## Data Base ##
 ./main/resources/application.properties
+./main/resources/application-prod.properties

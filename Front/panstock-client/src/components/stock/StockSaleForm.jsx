@@ -5,7 +5,7 @@ import {
   clearSaleState,
   selectSaleAction,
 } from '../../features/stock/stockSlice';
-import { selectToken, selectUser } from '../../features/auth/authSlice';
+import { selectToken } from '../../features/auth/authSlice';
 import { selectProducts, fetchProducts } from '../../features/catalog/productsSlice';
 import {
   selectPromotions,
@@ -339,7 +339,6 @@ function NoPriceBanner({ originalPrice, quantity }) {
 export default function StockSaleForm({ onSuccess, onCancel, initialProductId }) {
   const dispatch             = useDispatch();
   const token                = useSelector(selectToken);
-  const user                 = useSelector(selectUser);
   const products             = useSelector(selectProducts);
   const allPromotions        = useSelector(selectPromotions);
   const { status, error, lastResult } = useSelector(selectSaleAction);
@@ -476,7 +475,6 @@ export default function StockSaleForm({ onSuccess, onCancel, initialProductId })
 
     const payload = {
       productId:    Number(form.productId),
-      userId:       user?.id ?? null,
       quantity:     qty,
       unitSalePrice: unitSalePrice,           // ← precio real del momento
       notes:        buildNotes(unitSalePrice),

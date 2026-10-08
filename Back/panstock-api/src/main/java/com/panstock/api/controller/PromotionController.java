@@ -3,10 +3,12 @@ package com.panstock.api.controller;
 import com.panstock.api.dto.request.PromotionRequest;
 import com.panstock.api.dto.response.PromotionResponse;
 import com.panstock.api.dto.response.PromotionSuggestionResponse;
+import com.panstock.api.entity.User;
 import com.panstock.api.service.PromotionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -35,8 +37,10 @@ public class PromotionController {
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public PromotionResponse create(@Valid @RequestBody PromotionRequest request) {
-        return promotionService.create(request);
+    public PromotionResponse create(
+            @Valid @RequestBody PromotionRequest request,
+            @AuthenticationPrincipal User currentUser) {
+        return promotionService.create(request, currentUser);
     }
 
     /**

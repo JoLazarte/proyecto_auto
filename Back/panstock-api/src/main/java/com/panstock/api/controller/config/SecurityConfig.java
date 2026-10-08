@@ -70,12 +70,12 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.PUT,    "/api/suppliers/**").hasRole(Role.OWNER.name())
                     .requestMatchers(HttpMethod.DELETE, "/api/suppliers/**").hasRole(Role.OWNER.name())
 
-                    // ── Stock: OWNER + EMPLOYEE ───────────────────────────────────────
-                    .requestMatchers("/api/stock/**").authenticated()
-
                     // ── Restock suggestions: OWNER only ───────────────────────────────
                     .requestMatchers(HttpMethod.GET, "/api/stock/restock-suggestions").hasRole(Role.OWNER.name())
 
+                    // ── Stock: OWNER + EMPLOYEE ───────────────────────────────────────
+                    .requestMatchers("/api/stock/**").authenticated()
+                    
                     // ── Waste records: OWNER + EMPLOYEE ───────────────────────────────
                     .requestMatchers(HttpMethod.GET,  "/api/waste-records").authenticated()
                     .requestMatchers(HttpMethod.GET,  "/api/waste-records/**").authenticated()

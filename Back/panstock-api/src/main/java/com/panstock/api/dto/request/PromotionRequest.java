@@ -17,8 +17,6 @@ public record PromotionRequest(
 
         Long batchId,
 
-        Long createdById,
-
         @NotBlank(message = "El título de la promoción es obligatorio.")
         @Size(max = 150, message = "El título no puede superar los 150 caracteres.")
         String title,

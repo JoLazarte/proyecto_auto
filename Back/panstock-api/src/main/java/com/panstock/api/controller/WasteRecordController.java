@@ -2,12 +2,14 @@ package com.panstock.api.controller;
 
 import com.panstock.api.dto.request.WasteRecordRequest;
 import com.panstock.api.dto.response.WasteRecordResponse;
+import com.panstock.api.entity.User;
 import com.panstock.api.enums.WasteReason;
 import com.panstock.api.service.WasteRecordService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -37,8 +39,10 @@ public class WasteRecordController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public WasteRecordResponse create(@Valid @RequestBody WasteRecordRequest request) {
-        return wasteRecordService.create(request);
+    public WasteRecordResponse create(
+            @Valid @RequestBody WasteRecordRequest request,
+            @AuthenticationPrincipal User currentUser) {
+        return wasteRecordService.create(request, currentUser);
     }
 
     @GetMapping

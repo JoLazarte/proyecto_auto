@@ -11,8 +11,6 @@ public record StockAdjustmentRequest(
         @NotNull(message = "El lote es obligatorio.")
         Long batchId,
 
-        Long userId,
-
         @NotNull(message = "El tipo de ajuste es obligatorio.")
         StockAdjustmentType adjustmentType,
 

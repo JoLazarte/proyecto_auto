@@ -7,6 +7,7 @@ import com.panstock.api.dto.response.ExpirationItemResponse;
 import com.panstock.api.dto.response.InventoryBatchResponse;
 import com.panstock.api.dto.response.StockOperationResponse;
 import com.panstock.api.dto.response.StockSummaryResponse;
+import com.panstock.api.entity.User;
 import com.panstock.api.enums.ExpirationStatus;
 
 import java.time.LocalDate;
@@ -16,9 +17,9 @@ public interface StockService {
 
     InventoryBatchResponse registerEntry(StockEntryRequest request);
 
-    StockOperationResponse registerSale(StockSaleRequest request);
+    StockOperationResponse registerSale(StockSaleRequest request, User currentUser);
 
-    StockOperationResponse registerAdjustment(StockAdjustmentRequest request);
+    StockOperationResponse registerAdjustment(StockAdjustmentRequest request, User currentUser);
 
     List<StockSummaryResponse> getStockSummary();
 

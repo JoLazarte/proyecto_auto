@@ -109,11 +109,10 @@ const resolveDiscountDisplay = (promotion) => {
   return null;
 };
 
-const buildCreatePayload = ({ productId, batchId, form, userId, suggestedBySystem = false }) => {
+const buildCreatePayload = ({ productId, batchId, form, suggestedBySystem = false }) => {
   const base = {
     productId,
     batchId: batchId || null,
-    createdById: userId ?? null,
     title: form.title.trim(),
     description: null,
     startDate: form.startDate,
@@ -621,7 +620,6 @@ function PromotionCard({ promotion, onCancel, cancelling, isOwnerUser, highlight
 function CreatePromotionForm({ productId, batchId, productName, suggestion, originalPrice, onSuccess, onCancel }) {
   const dispatch = useDispatch();
   const token    = useSelector(selectToken);
-  const user     = useSelector(selectUser);
   const { status, error } = useSelector(selectPromotionAction);
 
   const isSuggestion = Boolean(suggestion);
@@ -678,7 +676,6 @@ function CreatePromotionForm({ productId, batchId, productName, suggestion, orig
       productId: resolvedProductId,
       batchId: resolvedBatchId,
       form,
-      userId: user?.id,
       suggestedBySystem: isSuggestion,
     });
     dispatch(createPromotion({ token, data: payload }));

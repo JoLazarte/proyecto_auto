@@ -100,7 +100,7 @@ export const autoWasteExpiredBatch = createAsyncThunk(
 
       const data = {
         batchId,
-        userId:   null,
+        automatic: true,
         quantity,
         reason:   'EXPIRED',
         notes:    'Descarte automático de lote vencido (sistema).',

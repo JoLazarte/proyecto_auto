@@ -14,7 +14,6 @@ import com.panstock.api.exception.ResourceNotFoundException;
 import com.panstock.api.mapper.InventoryBatchMapper;
 import com.panstock.api.mapper.StockMovementMapper;
 import com.panstock.api.repository.*;
-import com.panstock.api.repository.jpa.UserJpaRepository;
 import com.panstock.api.service.StockService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -40,7 +39,6 @@ public class StockServiceImpl implements StockService {
     private final InventoryBatchRepository inventoryBatchRepository;
     private final StockMovementRepository  stockMovementRepository;
     private final AppSettingRepository     appSettingRepository;
-    private final UserJpaRepository        userRepository;
 
     // ── Entry ────────────────────────────────────────────────────────────────
 
@@ -90,7 +88,7 @@ public class StockServiceImpl implements StockService {
     // ── Sale ─────────────────────────────────────────────────────────────────
 
     @Override
-    public StockOperationResponse registerSale(StockSaleRequest request) {
+    public StockOperationResponse registerSale(StockSaleRequest request, User currentUser) {
         validatePositiveQuantity(request.quantity(), "La cantidad vendida debe ser mayor a cero.");
 
         Product product = productRepository.findById(request.productId())
@@ -99,7 +97,7 @@ public class StockServiceImpl implements StockService {
 
         validateProductCanMoveStock(product);
 
-        User user = findUserIfPresent(request.userId());
+        User user = currentUser;
 
         List<InventoryBatch> sellableBatches =
                 inventoryBatchRepository.findSellableByProductId(product.getId());
@@ -152,7 +150,7 @@ public class StockServiceImpl implements StockService {
     // ── Adjustment ────────────────────────────────────────────────────────────
 
     @Override
-    public StockOperationResponse registerAdjustment(StockAdjustmentRequest request) {
+    public StockOperationResponse registerAdjustment(StockAdjustmentRequest request, User currentUser) {
         validatePositiveQuantity(request.quantity(), "La cantidad del ajuste debe ser mayor a cero.");
 
         InventoryBatch batch = inventoryBatchRepository.findById(request.batchId())
@@ -162,7 +160,7 @@ public class StockServiceImpl implements StockService {
         Product product = batch.getProduct();
         validateProductCanMoveStock(product);
 
-        User user = findUserIfPresent(request.userId());
+        User user = currentUser;
 
         if (batch.getBatchStatus() == BatchStatus.DISCARDED) {
             throw new BadRequestException("No se puede ajustar un lote descartado.");
@@ -351,13 +349,6 @@ public class StockServiceImpl implements StockService {
     private void validateProductCanMoveStock(Product product) {
         if (Boolean.FALSE.equals(product.getActive()))
             throw new BadRequestException("No se puede operar stock sobre un producto inactivo.");
-    }
-
-    private User findUserIfPresent(Long userId) {
-        if (userId == null) return null;
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Usuario no encontrado con id " + userId));
     }
 
     private ExpirationItemResponse toExpirationItem(InventoryBatch batch) {

@@ -9,8 +9,6 @@ public record StockSaleRequest(
         @NotNull(message = "El producto es obligatorio.")
         Long productId,
 
-        Long userId,
-
         @NotNull(message = "La cantidad vendida es obligatoria.")
         @DecimalMin(value = "0.001", message = "La cantidad vendida debe ser mayor a cero.")
         BigDecimal quantity,

@@ -259,7 +259,6 @@ export default function WasteForm({ onSuccess, onCancel }) {
         token,
         data: {
           batchId:  Number(form.batchId),
-          userId:   user.id,
           quantity: Number(form.quantity),
           reason:   form.reason,
           notes:    form.notes.trim() || null,

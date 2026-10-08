@@ -2,6 +2,7 @@ package com.panstock.api.service;
 
 import com.panstock.api.dto.request.WasteRecordRequest;
 import com.panstock.api.dto.response.WasteRecordResponse;
+import com.panstock.api.entity.User;
 import com.panstock.api.enums.WasteReason;
 
 import java.time.LocalDate;
@@ -13,7 +14,7 @@ public interface WasteRecordService {
      * Crea un registro de merma, descuenta el stock del lote y
      * genera el movimiento de stock tipo WASTE.
      */
-    WasteRecordResponse create(WasteRecordRequest request);
+    WasteRecordResponse create(WasteRecordRequest request, User currentUser);
 
     /**
      * Lista mermas con filtros opcionales:

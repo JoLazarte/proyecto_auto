@@ -10,7 +10,6 @@ import com.panstock.api.exception.BadRequestException;
 import com.panstock.api.exception.ResourceNotFoundException;
 import com.panstock.api.mapper.WasteRecordMapper;
 import com.panstock.api.repository.*;
-import com.panstock.api.repository.jpa.UserJpaRepository;
 import com.panstock.api.service.WasteRecordService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -34,25 +33,25 @@ public class WasteRecordServiceImpl implements WasteRecordService {
     private final InventoryBatchRepository inventoryBatchRepository;
     private final WasteRecordRepository    wasteRecordRepository;
     private final StockMovementRepository  stockMovementRepository;
-    private final UserJpaRepository        userRepository;
 
     // ── CREATE ──────────────────────────────────────────────────────────────
 
     @Override
-    public WasteRecordResponse create(WasteRecordRequest request) {
+    public WasteRecordResponse create(WasteRecordRequest request, User currentUser) {
         InventoryBatch batch = inventoryBatchRepository.findById(request.batchId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Lote no encontrado con id " + request.batchId()));
 
         validateWasteRequest(batch, request);
 
-        // userId puede ser null → registro automático del sistema
-        User user = null;
-        if (request.userId() != null) {
-            user = userRepository.findById(request.userId())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Usuario no encontrado con id " + request.userId()));
+        // El autor sale del usuario autenticado, nunca del request.
+        // Solo el descarte automático de un lote vencido queda sin autor (null).
+        boolean automatic = Boolean.TRUE.equals(request.automatic());
+        if (automatic && request.reason() != WasteReason.EXPIRED) {
+            throw new BadRequestException(
+                    "Solo se puede registrar como automático un descarte por vencimiento.");
         }
+        User user = automatic ? null : currentUser;
 
         Product product       = batch.getProduct();
         BigDecimal unitCost      = batch.getUnitCost()      != null ? batch.getUnitCost()      : product.getCostPrice();

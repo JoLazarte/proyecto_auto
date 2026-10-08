@@ -11,7 +11,6 @@ import com.panstock.api.exception.BadRequestException;
 import com.panstock.api.exception.ResourceNotFoundException;
 import com.panstock.api.mapper.PromotionMapper;
 import com.panstock.api.repository.*;
-import com.panstock.api.repository.jpa.UserJpaRepository;
 import com.panstock.api.service.PromotionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -38,7 +37,6 @@ public class PromotionServiceImpl implements PromotionService {
     private final PromotionRepository      promotionRepository;
     private final ProductRepository        productRepository;
     private final InventoryBatchRepository inventoryBatchRepository;
-    private final UserJpaRepository        userRepository;
     private final AppSettingRepository     appSettingRepository;
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -73,7 +71,7 @@ public class PromotionServiceImpl implements PromotionService {
     // Solo OWNER. Crea la promoción.
     // ─────────────────────────────────────────────────────────────────────────
     @Override
-    public PromotionResponse create(PromotionRequest request) {
+    public PromotionResponse create(PromotionRequest request, User currentUser) {
         Product product = productRepository.findById(request.productId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Producto no encontrado con id " + request.productId()));
@@ -88,7 +86,7 @@ public class PromotionServiceImpl implements PromotionService {
             validateBatchForPromotion(product, batch);
         }
 
-        User user = findUserIfPresent(request.createdById());
+        User user = currentUser;
         validatePromotionRequest(request);
 
         Promotion promotion = new Promotion();
@@ -227,13 +225,6 @@ public class PromotionServiceImpl implements PromotionService {
         return inventoryBatchRepository.findById(batchId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Lote no encontrado con id " + batchId));
-    }
-
-    private User findUserIfPresent(Long userId) {
-        if (userId == null) return null;
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Usuario no encontrado con id " + userId));
     }
 
     private void validateBatchForPromotion(Product product, InventoryBatch batch) {
