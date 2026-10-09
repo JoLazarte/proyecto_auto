@@ -109,6 +109,7 @@ export default function AppTopbar() {
           label: 'Reportes',      
           icon: '📊', 
           badge: null },
+        { to: '/users', label: 'Empleados', icon: '👥', badge: null },
       ]
     : [];
 

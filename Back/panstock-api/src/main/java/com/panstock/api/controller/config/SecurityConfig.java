@@ -41,8 +41,8 @@ public class SecurityConfig {
                     // ── Preflight ────────────────────────────────────────────────────
                     .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                    // ── Auth: public ─────────────────────────────────────────────────
-                    .requestMatchers("/auth/**").permitAll()
+                    // ── Auth: solo el login es público (no hay registro abierto) ─────
+                    .requestMatchers(HttpMethod.POST, "/auth/authenticate").permitAll()
 
                     // ── Service Worker: public ────────────────────────────────────────
                     .requestMatchers("/sw.js").permitAll()

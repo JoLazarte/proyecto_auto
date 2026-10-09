@@ -8,8 +8,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import com.panstock.api.controller.auth.RegisterRequest;
 import com.panstock.api.dto.UserDTO;
+import com.panstock.api.dto.request.CreateEmployeeRequest;
 import com.panstock.api.entity.User;
 import com.panstock.api.enums.Role;
 import com.panstock.api.exception.UserException;
@@ -35,7 +35,11 @@ public class UserServiceImpl implements UserService {
 
     @Transactional
     @Override
-    public User createUser(RegisterRequest request) {
+    public User createEmployee(CreateEmployeeRequest request, User createdBy) {
+        if (createdBy == null || createdBy.getRole() != Role.OWNER) {
+            throw new UserException("Solo un OWNER puede crear empleados.");
+        }
+
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new UserException("El usuario " + request.getUsername() + " ya existe");
         }
@@ -44,17 +48,19 @@ public class UserServiceImpl implements UserService {
             throw new UserException("El email " + request.getEmail() + " ya está registrado.");
         }
 
-        User user = User.builder()
+        User employee = User.builder()
                 .username(request.getUsername())
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
-                .role(request.getRole())
-                .enabled(true) // Siempre habilitado al crear
+                .role(Role.EMPLOYEE) // siempre EMPLOYEE: el rol nunca viene del request
+                .enabled(true)
                 .build();
 
-        return userRepository.save(user);
+        User saved = userRepository.save(employee);
+        log.info("Empleado {} creado por {}", saved.getUsername(), createdBy.getUsername());
+        return saved;
     }
 
     @Override
@@ -107,23 +113,38 @@ public class UserServiceImpl implements UserService {
     @Transactional
     @Override
     public void disableEmployee(User requestingUser, Long targetUserId) {
+        changeEnabled(requestingUser, targetUserId, false);
+    }
+
+    @Transactional
+    @Override
+    public void enableEmployee(User requestingUser, Long targetUserId) {
+        changeEnabled(requestingUser, targetUserId, true);
+    }
+
+    private void changeEnabled(User requestingUser, Long targetUserId, boolean enable) {
+        String verb = enable ? "habilitar" : "deshabilitar";
+
         if (requestingUser.getRole() != Role.OWNER) {
-            throw new UserException("Solo un OWNER puede deshabilitar usuarios.");
+            throw new UserException("Solo un OWNER puede " + verb + " usuarios.");
         }
 
         User target = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new UserException("Usuario no encontrado con id " + targetUserId));
 
         if (target.getRole() == Role.OWNER) {
-            throw new UserException("No se puede deshabilitar a un OWNER.");
+            throw new UserException("No se puede " + verb + " a un OWNER.");
         }
 
-        if (!target.isEnabled()) {
-            throw new UserException("El usuario ya está deshabilitado.");
+        if (target.isEnabled() == enable) {
+            throw new UserException(enable
+                    ? "El usuario ya está habilitado."
+                    : "El usuario ya está deshabilitado.");
         }
 
-        target.setEnabled(false);
+        target.setEnabled(enable);
         userRepository.save(target);
-        log.info("Usuario {} deshabilitado por {}", target.getUsername(), requestingUser.getUsername());
+        log.info("Usuario {} {} por {}", target.getUsername(),
+                enable ? "habilitado" : "deshabilitado", requestingUser.getUsername());
     }
 }

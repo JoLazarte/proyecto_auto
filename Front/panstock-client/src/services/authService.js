@@ -41,22 +41,6 @@ export const authService = {
   },
 
   /**
-   * POST /auth/register
-   * Body: { username, firstName, lastName, email, password, role }
-   * Returns: { ok: true, data: { access_token, username, email, role } }
-   */
-  register: async ({ username, firstName, lastName, email, password, role }) => {
-    const response = await fetch(`${BASE_URL}/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, firstName, lastName, email, password, role }),
-    });
-    
-    const data = await handleResponse(response);
-    return data.data || data;
-  },
-
-  /**
    * GET /users/data  (requires Bearer token)
    * Returns the authenticated user's profile
    */

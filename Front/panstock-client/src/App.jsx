@@ -7,7 +7,7 @@ import {
 } from './features/waste/autoWasteNotificationSlice';
 import ProtectedRoute  from './components/ProtectedRoute';
 import LoginPage       from './pages/LoginPage';
-import RegisterPage    from './pages/RegisterPage';
+import UsersPage       from './pages/UsersPage';
 import DashboardPage   from './pages/DashboardPage';
 import ExpirationPage  from './pages/ExpirationPage';
 import ProductsPage    from './pages/ProductsPage';
@@ -56,7 +56,7 @@ function TokenGuard() {
  *   y el usuario no confirmó aún).
  * - Se oculta temporalmente al hacer clic fuera del modal (dismiss).
  * - Reaparece CADA VEZ que la ruta cambia, hasta que el usuario confirme.
- * - No aparece en rutas de auth (/login, /register).
+ * - No aparece en la ruta de login (/login).
  *
  * Manejo de race condition con redux-persist:
  * Al hacer login, redux-persist ejecuta REHYDRATE *después* del primer
@@ -73,8 +73,7 @@ function AutoWasteModalController() {
   const [visible, setVisible] = useState(false);
 
   const isAuthRoute =
-    location.pathname === '/login' ||
-    location.pathname === '/register';
+    location.pathname === '/login';
 
    // ── Efecto 1: reaparece en cada cambio de RUTA ───────────────────────────
     // Cubre la navegación normal entre páginas mientras hay lotes pendientes.
@@ -132,10 +131,6 @@ export default function App() {
           path="/login"
           element={isAuth ? <Navigate to="/dashboard" replace /> : <LoginPage />}
         />
-        <Route
-          path="/register"
-          element={isAuth ? <Navigate to="/dashboard" replace /> : <RegisterPage />}
-        />
 
         {/* ── Rutas protegidas — ambos roles (OWNER y EMPLOYEE) ──────────── */}
         <Route path="/dashboard"   element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
@@ -150,11 +145,15 @@ export default function App() {
         {/* ── Rutas solo OWNER ──────────────────────────────────────────── */}
         <Route
           path="/restock"
-          element={<ProtectedRoute requireRole="OWNER"><Restockpage /></ProtectedRoute>}
+          element={<ProtectedRoute requiredRole="OWNER"><Restockpage /></ProtectedRoute>}
         />
         <Route
           path="/reports"
-          element={<ProtectedRoute requireRole="OWNER"><ReportsPage /></ProtectedRoute>}
+          element={<ProtectedRoute requiredRole="OWNER"><ReportsPage /></ProtectedRoute>}
+        />
+        <Route
+          path="/users"
+          element={<ProtectedRoute requiredRole="OWNER"><UsersPage /></ProtectedRoute>}
         />
 
         {/* ── Fallback ──────────────────────────────────────────────────── */}

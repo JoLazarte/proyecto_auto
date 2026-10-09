@@ -53,6 +53,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
+                if (!userDetails.isEnabled()) {
+                    // Un empleado deshabilitado pierde el acceso aunque su token no haya vencido
+                    log.warn("Token de usuario deshabilitado rechazado: {}", username);
+                    SecurityContextHolder.clearContext();
+                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Usuario deshabilitado");
+                    return;
+                }
                 if (jwtService.isTokenValid(jwt, userDetails) && !jwtService.isTokenExpired(jwt)) {
                     UsernamePasswordAuthenticationToken authToken =
                             new UsernamePasswordAuthenticationToken(

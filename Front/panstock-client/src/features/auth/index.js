@@ -1,7 +1,6 @@
 export {
   default as authReducer,
   loginUser,
-  registerUser,
   fetchProfile,
   logout,
   clearError,

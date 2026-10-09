@@ -15,18 +15,6 @@ export const loginUser = createAsyncThunk(
   }
 );
 
-export const registerUser = createAsyncThunk(
-  'auth/register',
-  async (userData, { rejectWithValue }) => {
-    try {
-      const data = await authService.register(userData);
-      return data;
-    } catch (error) {
-      return rejectWithValue(error.message);
-    }
-  }
-);
-
 export const fetchProfile = createAsyncThunk(
   'auth/fetchProfile',
   async (_, { getState, rejectWithValue }) => {
@@ -42,7 +30,7 @@ export const fetchProfile = createAsyncThunk(
 );
 
 // ─── Helper: extrae el objeto user de la respuesta del backend ───────────────
-// La respuesta de /auth/authenticate y /auth/register devuelve:
+// La respuesta de /auth/authenticate devuelve:
 //   { accessToken, userId, username, email, role, firstName, lastName }
 // Mapeamos userId → id para que el store sea consistente.
 const extractUser = (payload) => ({
@@ -104,25 +92,6 @@ const authSlice = createSlice({
       .addCase(loginUser.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload || 'Error al iniciar sesión';
-        state.isAuthenticated = false;
-      });
-
-    // ── REGISTER ──
-    builder
-      .addCase(registerUser.pending, (state) => {
-        state.status = 'loading';
-        state.error = null;
-        state.lastAction = 'register';
-      })
-      .addCase(registerUser.fulfilled, (state, action) => {
-        state.status = 'succeeded';
-        state.isAuthenticated = true;
-        state.token = action.payload.access_token;
-        state.user = extractUser(action.payload);
-      })
-      .addCase(registerUser.rejected, (state, action) => {
-        state.status = 'failed';
-        state.error = action.payload || 'Error al registrarse';
         state.isAuthenticated = false;
       });
 

@@ -5,16 +5,23 @@ import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
-import com.panstock.api.controller.auth.RegisterRequest;
 import com.panstock.api.dto.UserDTO;
+import com.panstock.api.dto.request.CreateEmployeeRequest;
 import com.panstock.api.entity.User;
 
 import jakarta.transaction.Transactional;
 
 public interface UserService {
 
+    /**
+     * Crea un usuario con rol EMPLOYEE. Solo puede hacerlo un OWNER.
+     * El rol nunca se toma del request.
+     *
+     * @param request   datos del nuevo empleado
+     * @param createdBy el usuario autenticado que lo crea
+     */
     @Transactional
-    public User createUser(RegisterRequest request);
+    User createEmployee(CreateEmployeeRequest request, User createdBy);
 
     public User getUserByUsername(String username);
 
@@ -39,5 +46,15 @@ public interface UserService {
      */
     @Transactional
     void disableEmployee(User requestingUser, Long targetUserId);
+
+    /**
+     * Vuelve a habilitar a un EMPLOYEE deshabilitado.
+     * Solo puede ser llamado por un usuario con rol OWNER.
+     *
+     * @param requestingUser el usuario autenticado que hace la petición
+     * @param targetUserId   el ID del usuario a habilitar
+     */
+    @Transactional
+    void enableEmployee(User requestingUser, Long targetUserId);
 
 }

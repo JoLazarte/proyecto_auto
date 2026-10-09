@@ -13,8 +13,10 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Los errores (validación, credenciales inválidas, usuario duplicado, etc.)
- * se traducen a respuestas HTTP en GlobalExceptionHandler.
+ * Solo inicio de sesión. No hay registro público: los empleados los crea un OWNER
+ * desde POST /users.
+ * Los errores (validación, credenciales inválidas) se traducen a respuestas HTTP
+ * en GlobalExceptionHandler.
  */
 @RestController
 @RequestMapping("/auth")
@@ -22,12 +24,6 @@ import lombok.RequiredArgsConstructor;
 public class AuthenticationController {
 
     private final AuthenticationService authService;
-
-    @PostMapping("/register")
-    public ResponseEntity<ResponseData<AuthenticationResponse>> register(
-            @Valid @RequestBody RegisterRequest request) {
-        return ResponseEntity.ok(ResponseData.success(authService.register(request)));
-    }
 
     @PostMapping("/authenticate")
     public ResponseEntity<ResponseData<AuthenticationResponse>> authenticate(

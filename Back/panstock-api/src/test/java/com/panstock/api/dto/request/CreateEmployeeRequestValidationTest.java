@@ -1,19 +1,18 @@
-package com.panstock.api.controller.auth;
+package com.panstock.api.dto.request;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-
-import com.panstock.api.enums.Role;
 
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 
-class RegisterRequestValidationTest {
+class CreateEmployeeRequestValidationTest {
 
     private static Validator validator;
 
@@ -22,21 +21,20 @@ class RegisterRequestValidationTest {
         validator = Validation.buildDefaultValidatorFactory().getValidator();
     }
 
-    private RegisterRequest.RegisterRequestBuilder validRequest() {
-        return RegisterRequest.builder()
-                .username("lorena")
-                .firstName("Lorena")
+    private CreateEmployeeRequest.CreateEmployeeRequestBuilder validRequest() {
+        return CreateEmployeeRequest.builder()
+                .username("martina")
+                .firstName("Martina")
                 .lastName("Pérez")
-                .email("lorena@panstock.com")
-                .password("Password123")
-                .role(Role.EMPLOYEE);
+                .email("martina@panstock.com")
+                .password("Password123");
     }
 
-    private Set<String> invalidFields(RegisterRequest request) {
-        Set<ConstraintViolation<RegisterRequest>> violations = validator.validate(request);
+    private Set<String> invalidFields(CreateEmployeeRequest request) {
+        Set<ConstraintViolation<CreateEmployeeRequest>> violations = validator.validate(request);
         return violations.stream()
                 .map(v -> v.getPropertyPath().toString())
-                .collect(java.util.stream.Collectors.toSet());
+                .collect(Collectors.toSet());
     }
 
     @Test
@@ -58,7 +56,7 @@ class RegisterRequestValidationTest {
 
     @Test
     void emailWithoutAtSignIsRejected() {
-        assertThat(invalidFields(validRequest().email("lorena.panstock.com").build()))
+        assertThat(invalidFields(validRequest().email("martina.panstock.com").build()))
                 .containsExactly("email");
     }
 
@@ -66,11 +64,5 @@ class RegisterRequestValidationTest {
     void blankUsernameIsRejected() {
         assertThat(invalidFields(validRequest().username("   ").build()))
                 .contains("username");
-    }
-
-    @Test
-    void missingRoleIsRejected() {
-        assertThat(invalidFields(validRequest().role(null).build()))
-                .containsExactly("role");
     }
 }

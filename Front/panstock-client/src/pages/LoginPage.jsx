@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { loginUser, clearError, selectAuthStatus, selectAuthError, selectIsAuthenticated } from '../features/auth/authSlice';
 import { Input, Button, Alert } from '../components/ui/FormField';
 
@@ -172,8 +172,7 @@ export default function LoginPage() {
           </form>
 
           <div className="login-footer">
-            <span className="footer-text">¿No tenés cuenta?</span>
-            <Link to="/register" className="footer-link">Registrarse</Link>
+            <span className="footer-text">¿No tenés cuenta? Pedile acceso al dueño del local.</span>
           </div>
 
           {/* Demo hint */}

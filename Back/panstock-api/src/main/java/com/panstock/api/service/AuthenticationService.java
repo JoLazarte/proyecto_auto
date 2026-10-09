@@ -6,7 +6,6 @@ import org.springframework.stereotype.Service;
 
 import com.panstock.api.controller.auth.AuthenticationRequest;
 import com.panstock.api.controller.auth.AuthenticationResponse;
-import com.panstock.api.controller.auth.RegisterRequest;
 import com.panstock.api.controller.config.JwtService;
 import com.panstock.api.entity.User;
 import com.panstock.api.exception.UserException;
@@ -23,17 +22,10 @@ public class AuthenticationService {
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
-    private final UserService userService;
-
-    public AuthenticationResponse register(RegisterRequest request) {
-        User user = userService.createUser(request);
-        log.info("Usuario registrado: {} (rol {})", user.getUsername(), user.getRole());
-        return buildResponse(user);
-    }
 
     public AuthenticationResponse authenticate(AuthenticationRequest request) {
-        // Si las credenciales son inválidas lanza AuthenticationException,
-        // que GlobalExceptionHandler convierte en un 401.
+        // Si las credenciales son inválidas (o el usuario está deshabilitado) lanza
+        // AuthenticationException, que GlobalExceptionHandler convierte en un 401.
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         request.getUsername(),
@@ -44,10 +36,7 @@ public class AuthenticationService {
                         "El usuario " + request.getUsername() + " no existe."));
 
         log.info("Inicio de sesión: {}", user.getUsername());
-        return buildResponse(user);
-    }
 
-    private AuthenticationResponse buildResponse(User user) {
         return AuthenticationResponse.builder()
                 .accessToken(jwtService.generateToken(user))
                 .userId(user.getId())

@@ -5,12 +5,14 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.panstock.api.dto.UserDTO;
+import com.panstock.api.dto.request.CreateEmployeeRequest;
 import com.panstock.api.dto.response.ResponseData;
 import com.panstock.api.entity.User;
 import com.panstock.api.service.UserService;
@@ -26,6 +29,8 @@ import jakarta.validation.Valid;
 
 /**
  * Los errores se traducen a respuestas HTTP en GlobalExceptionHandler.
+ * Acceso (ver SecurityConfig): /users/data y /users/update para cualquier usuario
+ * autenticado; el resto de /users/** solo para OWNER.
  */
 @RestController
 @RequestMapping("/users")
@@ -41,6 +46,16 @@ public class UserController {
         if (page == null || size == null)
             return ResponseEntity.ok(userService.getUsers(PageRequest.of(0, Integer.MAX_VALUE)));
         return ResponseEntity.ok(userService.getUsers(PageRequest.of(page, size)));
+    }
+
+    // POST /users  →  un OWNER crea un empleado (rol EMPLOYEE, habilitado).
+    @PostMapping
+    public ResponseEntity<ResponseData<UserDTO>> createEmployee(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody CreateEmployeeRequest request) {
+        User owner = userService.getUserByUsername(userDetails.getUsername());
+        User created = userService.createEmployee(request, owner);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ResponseData.success(created.toDTO()));
     }
 
     @GetMapping("/data")
@@ -68,10 +83,11 @@ public class UserController {
 
     // -------------------------------------------------------
     // PATCH /users/{userId}/disable  →  deshabilitar un EMPLOYEE
+    // PATCH /users/{userId}/enable   →  volver a habilitarlo
     //
-    // Solo un OWNER autenticado puede llamar a este endpoint.
+    // Solo un OWNER autenticado puede llamar a estos endpoints.
     // No se puede deshabilitar a un OWNER (ni a sí mismo).
-    // Devuelve 204 No Content si tuvo éxito.
+    // Devuelven 204 No Content si tuvieron éxito.
     // -------------------------------------------------------
     @PatchMapping("/{userId}/disable")
     public ResponseEntity<Void> disableEmployee(
@@ -79,6 +95,15 @@ public class UserController {
             @PathVariable Long userId) {
         User requestingUser = userService.getUserByUsername(userDetails.getUsername());
         userService.disableEmployee(requestingUser, userId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{userId}/enable")
+    public ResponseEntity<Void> enableEmployee(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable Long userId) {
+        User requestingUser = userService.getUserByUsername(userDetails.getUsername());
+        userService.enableEmployee(requestingUser, userId);
         return ResponseEntity.noContent().build();
     }
 }
