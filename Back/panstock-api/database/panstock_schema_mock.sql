@@ -604,3 +604,36 @@ WHERE w.created_at >= DATE_SUB(NOW(), INTERVAL 6 DAY);
 -- JOIN products p ON p.id = wr.product_id
 -- LEFT JOIN users u ON u.id = wr.created_by_id
 -- ORDER BY wr.waste_date DESC;
+UPDATE inventory_batches SET current_quantity = 17.000 WHERE id = 9;
+UPDATE inventory_batches SET current_quantity = 17.000 WHERE id = 10;
+UPDATE inventory_batches SET current_quantity = 18.000 WHERE id = 11;
+UPDATE inventory_batches SET current_quantity =  9.000 WHERE id = 12;
+UPDATE inventory_batches SET current_quantity =  0.000, batch_status = 'DEPLETED' WHERE id = 21;
+
+-- Registrar los movimientos WASTE correspondientes en stock_movements
+INSERT INTO stock_movements
+    (product_id, batch_id, user_id, movement_type, quantity,
+     movement_date, notes, related_waste_record_id, created_at)
+SELECT
+    w.product_id,
+    w.batch_id,
+    w.created_by_id,
+    'WASTE',
+    w.quantity,
+    w.waste_date,
+    CONCAT('Descuento por merma. Motivo: ', w.reason),
+    w.id,
+    w.created_at
+FROM waste_records w
+WHERE w.created_at >= DATE_SUB(NOW(), INTERVAL 6 DAY);
+
+-- =========================================================
+-- VERIFICACIÓN DE MERMAS (descomentar para validar)
+-- =========================================================
+
+-- SELECT wr.id, p.name AS producto, wr.quantity, wr.reason,
+--        wr.economic_loss, u.first_name, u.last_name, wr.waste_date
+-- FROM waste_records wr
+-- JOIN products p ON p.id = wr.product_id
+-- LEFT JOIN users u ON u.id = wr.created_by_id
+-- ORDER BY wr.waste_date DESC;
